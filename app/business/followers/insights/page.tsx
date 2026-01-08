@@ -35,8 +35,6 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
 import {
@@ -79,6 +77,7 @@ const chartConfig = {
     color: "var(--chart-2)",
   },
 } satisfies ChartConfig;
+
 
 export default function FollowersInsightsPage() {
   const { data: session, status } = useSession();
@@ -386,7 +385,7 @@ export default function FollowersInsightsPage() {
                       cursor={false}
                       content={
                         <ChartTooltipContent
-                          labelFormatter={(value) => {
+                          labelFormatter={(value: any) => {
                             const date = new Date(value);
                             if (timeRange === "daily") {
                               return format(date, "d MMM yyyy", { locale: fr });
@@ -412,7 +411,6 @@ export default function FollowersInsightsPage() {
                       stroke="var(--color-newFollowers)"
                       stackId="a"
                     />
-                    <ChartLegend content={<ChartLegendContent />} />
                   </AreaChart>
                 </ChartContainer>
               )}
