@@ -42,9 +42,19 @@ interface EventCardProps {
     participantCount: number;
     waitlistCount: number;
   };
+  onView?: (event: any) => void;
+  onEdit?: (event: any) => void;
+  onDelete?: (eventId: number) => void;
+  showActions?: boolean;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({
+  event,
+  onView,
+  onEdit,
+  onDelete,
+  showActions = true,
+}: EventCardProps) {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
@@ -221,33 +231,68 @@ export function EventCard({ event }: EventCardProps) {
 
         {/* Actions */}
         <div className="flex items-center justify-between px-4 py-3 border-t">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLike}
-              className={`p-0 h-8 w-8 ${
-                isLiked ? "text-red-500" : "text-muted-foreground"
-              } hover:text-red-500`}
-            >
-              <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowComments(!showComments)}
-              className="p-0 h-8 w-8 text-muted-foreground hover:text-foreground"
-            >
-              <MessageCircle className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-0 h-8 w-8 text-muted-foreground hover:text-foreground"
-            >
-              <Share2 className="h-5 w-5" />
-            </Button>
-          </div>
+          {showActions && (onView || onEdit || onDelete) ? (
+            <div className="flex items-center space-x-2">
+              {onView && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onView(event)}
+                  className="text-xs"
+                >
+                  Voir
+                </Button>
+              )}
+              {onEdit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEdit(event)}
+                  className="text-xs"
+                >
+                  Modifier
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => onDelete(event.id)}
+                  className="text-xs"
+                >
+                  Supprimer
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLike}
+                className={`p-0 h-8 w-8 ${
+                  isLiked ? "text-red-500" : "text-muted-foreground"
+                } hover:text-red-500`}
+              >
+                <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowComments(!showComments)}
+                className="p-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+              >
+                <Share2 className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
           <div className="text-xs text-muted-foreground">
             {likeCount > 0 && `${likeCount} like${likeCount > 1 ? "s" : ""}`}
           </div>

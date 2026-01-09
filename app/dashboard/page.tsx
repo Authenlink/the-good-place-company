@@ -19,12 +19,10 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useScroll } from "@/hooks/use-scroll";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const hasScrolled = useScroll();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -70,11 +68,7 @@ export default function DashboardPage() {
     <SidebarProvider>
       <DynamicSidebar />
       <SidebarInset>
-        <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
-            hasScrolled ? "border-b" : ""
-          }`}
-        >
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -86,9 +80,7 @@ export default function DashboardPage() {
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block">
-                  &gt;
-                </BreadcrumbSeparator>
+                <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
                   <BreadcrumbPage>Overview</BreadcrumbPage>
                 </BreadcrumbItem>
