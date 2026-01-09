@@ -38,6 +38,9 @@ interface Event {
   city: string | null;
   images: string[] | null;
   maxParticipants: number | null;
+  isPaid: boolean;
+  price: string | null;
+  currency: string;
   status: EventStatus;
   companyId: number;
   companyName: string | null;
@@ -292,7 +295,11 @@ export default function EventsPage() {
               events.map((event) => (
                 <EventCard
                   key={event.id}
-                  event={event}
+                  event={{
+                    ...event,
+                    startDate: new Date(event.startDate),
+                    endDate: event.endDate ? new Date(event.endDate) : null,
+                  }}
                   onView={handleView}
                   onEdit={handleEdit}
                   onDelete={handleDelete}

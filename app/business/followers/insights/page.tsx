@@ -386,7 +386,7 @@ export default function FollowersInsightsPage() {
                       cursor={false}
                       content={
                         <ChartTooltipContent
-                          labelFormatter={(value) => {
+                          labelFormatter={(value: string | number | Date) => {
                             const date = new Date(value);
                             if (timeRange === "daily") {
                               return format(date, "d MMM yyyy", { locale: fr });
