@@ -2,9 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { useEffect } from "react";
 import { DynamicSidebar } from "@/components/dynamic-sidebar";
 import {
   Breadcrumb,
@@ -28,56 +26,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Calendar,
-  FolderKanban,
-  Users,
-  MessageSquare,
-  Plus,
-  ArrowRight,
-} from "lucide-react";
-import { EventType } from "@/lib/schema";
-import {
-  EventCalendar,
-  EventCalendarSkeleton,
-  type CalendarEvent,
-} from "@/components/event-calendar";
-import { useScroll } from "@/hooks/use-scroll";
-
-interface Event {
-  id: number;
-  title: string;
-  eventType: EventType;
-  startDate: string;
-  endDate?: string | null;
-  location?: string | null;
-  city?: string | null;
-  status: string;
-  participantCount: number;
-  maxParticipants?: number | null;
-}
-
-interface Post {
-  id: number;
-  content: string;
-  createdAt: string;
-}
+import { Calendar, FolderKanban, Users, TrendingUp } from "lucide-react";
 
 export default function BusinessDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [events, setEvents] = useState<Event[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [projectsCount, setProjectsCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const hasScrolled = useScroll();
-
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     }
+    // Redirect regular users to user dashboard
     if (
       status === "authenticated" &&
       session?.user?.accountType !== "business"
@@ -85,67 +44,6 @@ export default function BusinessDashboardPage() {
       router.push("/dashboard");
     }
   }, [status, session, router]);
-
-  useEffect(() => {
-    if (
-      status === "authenticated" &&
-      session?.user?.accountType === "business"
-    ) {
-      fetchData();
-    }
-  }, [status, session]);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // Fetch events
-      const eventsResponse = await fetch("/api/events?companyOnly=true");
-      if (eventsResponse.ok) {
-        const eventsData = await eventsResponse.json();
-        setEvents(eventsData);
-      }
-
-      // Fetch posts
-      const postsResponse = await fetch("/api/posts");
-      if (postsResponse.ok) {
-        const postsData = await postsResponse.json();
-        setPosts(postsData);
-      }
-
-      // Fetch projects count
-      const projectsResponse = await fetch(
-        "/api/projects?companyOnly=true&status=active"
-      );
-      if (projectsResponse.ok) {
-        const projectsData = await projectsResponse.json();
-        setProjectsCount(projectsData.length);
-      }
-    } catch (error) {
-      console.error("Erreur lors du chargement des données:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Convertir les événements pour le calendrier
-  const calendarEvents: CalendarEvent[] = events
-    .filter((e) => e.status === "published")
-    .map((e) => ({
-      id: e.id,
-      title: e.title,
-      eventType: e.eventType,
-      startDate: e.startDate,
-      endDate: e.endDate,
-      location: e.location,
-      city: e.city,
-      participantCount: e.participantCount,
-      maxParticipants: e.maxParticipants,
-      status: e.status,
-    }));
-
-  const handleEventClick = (event: CalendarEvent) => {
-    router.push(`/business/events/${event.id}`);
-  };
 
   if (status === "loading") {
     return (
@@ -158,17 +56,11 @@ export default function BusinessDashboardPage() {
               <Skeleton className="h-4 w-32" />
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             <div className="grid gap-4 md:grid-cols-4">
               {[...Array(4)].map((_, i) => (
                 <Skeleton key={i} className="h-32 rounded-xl" />
               ))}
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <EventCalendarSkeleton />
-              </div>
-              <Skeleton className="h-96 rounded-xl" />
             </div>
           </div>
         </SidebarInset>
@@ -180,24 +72,11 @@ export default function BusinessDashboardPage() {
     return null;
   }
 
-  // Calculer les stats
-  const upcomingEvents = events.filter(
-    (e) => new Date(e.startDate) >= new Date() && e.status === "published"
-  );
-  const totalParticipants = events.reduce(
-    (acc, e) => acc + (e.participantCount || 0),
-    0
-  );
-
   return (
     <SidebarProvider>
       <DynamicSidebar />
       <SidebarInset>
-        <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
-            hasScrolled ? "border-b" : ""
-          }`}
-        >
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -211,7 +90,9 @@ export default function BusinessDashboardPage() {
                     Business Portal
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbSeparator className="hidden md:block">
+                  &gt;
+                </BreadcrumbSeparator>
                 <BreadcrumbItem>
                   <BreadcrumbPage>Dashboard</BreadcrumbPage>
                 </BreadcrumbItem>
@@ -219,184 +100,117 @@ export default function BusinessDashboardPage() {
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
-          <div className="mb-2">
-            <h1 className="text-2xl font-bold">Tableau de bord</h1>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="mb-4">
+            <h1 className="text-2xl font-bold">Business Dashboard</h1>
             <p className="text-muted-foreground">
-              Bienvenue, {session.user.name} ! Gérez vos événements et votre
-              communauté.
+              Welcome back, {session.user.name}! Manage your events and
+              projects.
             </p>
           </div>
 
           {/* Stats Cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* 1. Événements */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Événements
+                  Total Events
                 </CardTitle>
                 <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-12" /> : events.length}
-                </div>
+                <div className="text-2xl font-bold">0</div>
                 <p className="text-xs text-muted-foreground">
-                  {upcomingEvents.length} à venir
+                  Create your first event
                 </p>
               </CardContent>
             </Card>
-
-            {/* 2. Projets */}
-            <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => router.push("/business/projects")}
-            >
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Projets actifs
+                  Active Projects
                 </CardTitle>
                 <FolderKanban className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-12" /> : projectsCount}
-                </div>
+                <div className="text-2xl font-bold">0</div>
                 <p className="text-xs text-muted-foreground">
-                  Projets en cours
+                  Start a new project
                 </p>
               </CardContent>
             </Card>
-
-            {/* 3. Posts */}
-            <Card
-              className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => router.push("/business/posts")}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Posts</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-12" /> : posts.length}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Publications totales
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* 4. Participants / Followers */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Participants
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Followers</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {loading ? (
-                    <Skeleton className="h-8 w-12" />
-                  ) : (
-                    totalParticipants
-                  )}
-                </div>
+                <div className="text-2xl font-bold">0</div>
                 <p className="text-xs text-muted-foreground">
-                  Inscrits aux événements
+                  Build your audience
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Engagement
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">0%</div>
+                <p className="text-xs text-muted-foreground">
+                  Interaction rate
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Calendrier et Posts */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            {/* Calendrier des événements - 2/3 de la largeur */}
-            <div className="lg:col-span-2">
-              {loading ? (
-                <EventCalendarSkeleton />
-              ) : (
-                <EventCalendar
-                  events={calendarEvents}
-                  loading={loading}
-                  title="Calendrier des événements"
-                  description="Vos événements à venir"
-                  onEventClick={handleEventClick}
-                  onCreateClick={() => router.push("/business/events/create")}
-                />
-              )}
-            </div>
-
-            {/* Posts récents - 1/3 de la largeur */}
-            <Card className="h-fit">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Posts récents</CardTitle>
-                  <CardDescription>Vos dernières publications</CardDescription>
-                </div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => router.push("/business/posts/create")}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Créer
-                </Button>
+          {/* Quick Actions */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Events</CardTitle>
+                <CardDescription>
+                  Your latest events and their performance
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <div className="space-y-3">
-                    {[...Array(4)].map((_, i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                  </div>
-                ) : posts.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-40 text-center">
-                    <MessageSquare className="h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground text-sm">
-                      Aucun post publié
-                    </p>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      onClick={() => router.push("/business/posts/create")}
-                    >
-                      Créer votre premier post
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {posts.slice(0, 4).map((post) => (
-                      <div
-                        key={post.id}
-                        className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => router.push("/business/posts")}
-                      >
-                        <p className="text-sm line-clamp-2">{post.content}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(post.createdAt), "d MMM yyyy", {
-                            locale: fr,
-                          })}
-                        </p>
-                      </div>
-                    ))}
-                    {posts.length > 4 && (
-                      <Button
-                        variant="ghost"
-                        className="w-full"
-                        onClick={() => router.push("/business/posts")}
-                      >
-                        Voir tous les posts
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    )}
-                  </div>
-                )}
+                <div className="flex items-center justify-center h-32 text-muted-foreground">
+                  No events yet. Create your first event!
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Projects</CardTitle>
+                <CardDescription>
+                  Your active projects and updates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-center h-32 text-muted-foreground">
+                  No projects yet. Start a new project!
+                </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Activity Feed */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity Feed</CardTitle>
+              <CardDescription>
+                Recent interactions and notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center h-48 text-muted-foreground">
+                No recent activity. Start engaging with your audience!
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </SidebarInset>
     </SidebarProvider>

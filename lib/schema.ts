@@ -19,6 +19,11 @@ export const users = pgTable("users", {
   image: text("image"),
   password: text("password"), // Hashé avec bcrypt, nullable pour OAuth
   accountType: text("account_type").notNull().default("user"), // "user" | "business"
+  // Champs de profil utilisateur
+  bio: text("bio"), // Description/biographie
+  location: text("location"), // Localisation géographique
+  website: text("website"), // Site web personnel
+  banner: text("banner"), // Image de bannière
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -34,6 +39,7 @@ export const areas = pgTable("areas", {
 export const companyValues = pgTable("company_values", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
+  color: text("color").notNull().default("bg-gray-500"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -53,6 +59,8 @@ export const companies = pgTable("companies", {
   email: text("email"),
   phone: text("phone"),
   address: text("address"),
+  city: text("city"),
+  coordinates: jsonb("coordinates").$type<{ lat: number; lng: number }>(), // Coordonnées GPS directes
   website: text("website"),
   founded: text("founded"),
   size: text("size"),

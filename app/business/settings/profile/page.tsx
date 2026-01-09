@@ -49,7 +49,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useScroll } from "@/hooks/use-scroll";
 import { UploadButton } from "@/components/ui/upload-button";
 import {
   Building2,
@@ -74,7 +73,6 @@ export default function CompanyProfilePage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const hasScrolled = useScroll();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -178,7 +176,21 @@ export default function CompanyProfilePage() {
   ];
 
   // Company data loaded from API
-  const [companyData, setCompanyData] = useState({
+  const [companyData, setCompanyData] = useState<{
+    name: string;
+    description: string;
+    email: string;
+    phone: string;
+    address: string;
+    website: string;
+    founded: string;
+    industry: string;
+    size: string;
+    logo: string;
+    background: string;
+    areaId: string;
+    values: string[];
+  }>({
     name: "",
     description: "",
     email: "",
@@ -191,7 +203,7 @@ export default function CompanyProfilePage() {
     logo: "",
     background: "",
     areaId: "",
-    values: [] as string[],
+    values: [],
   });
 
   const [formData, setFormData] = useState(companyData);
@@ -211,7 +223,7 @@ export default function CompanyProfilePage() {
               <Skeleton className="h-4 w-32" />
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             <div className="grid gap-4 md:grid-cols-2">
               {[...Array(4)].map((_, i) => (
                 <Skeleton key={i} className="h-32 rounded-xl" />
@@ -300,11 +312,7 @@ export default function CompanyProfilePage() {
     <SidebarProvider>
       <DynamicSidebar />
       <SidebarInset>
-        <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
-            hasScrolled ? "border-b" : ""
-          }`}
-        >
+        <header className="flex h-16 shrink-0 items-center transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex justify-between items-center w-full px-4">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-1" />
@@ -340,7 +348,7 @@ export default function CompanyProfilePage() {
             )}
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="mb-4">
             <h1 className="text-2xl font-bold">Profil entreprise</h1>
             <p className="text-muted-foreground">

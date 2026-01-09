@@ -4,6 +4,63 @@ import { companies } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 
+// Fonction pour géocoder une adresse
+async function geocodeAddress(
+  address: string,
+  city: string
+): Promise<{ lat: number; lng: number } | null> {
+  try {
+    console.log(`🗺️ Géocodage de l'adresse: ${address}, ${city}`);
+
+    // D'abord essayer avec Google Maps si la clé API est disponible
+    const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (googleApiKey) {
+      const googleQuery = encodeURIComponent(`${address}, ${city}, France`);
+      const googleResponse = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${googleQuery}&key=${googleApiKey}&region=fr&language=fr`
+      );
+
+      if (googleResponse.ok) {
+        const googleData = await googleResponse.json();
+        if (googleData.status === "OK" && googleData.results.length > 0) {
+          const location = googleData.results[0].geometry.location;
+          console.log(`✅ Google Maps: ${location.lat}, ${location.lng}`);
+          return { lat: location.lat, lng: location.lng };
+        }
+      }
+    }
+
+    // Fallback vers Nominatim (OpenStreetMap)
+    const nominatimQuery = encodeURIComponent(`${address}, ${city}, France`);
+    const nominatimResponse = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${nominatimQuery}&limit=1&countrycodes=fr&addressdetails=1`
+    );
+
+    if (nominatimResponse.ok) {
+      const nominatimData = await nominatimResponse.json();
+      if (
+        nominatimData.length > 0 &&
+        nominatimData[0].lat &&
+        nominatimData[0].lon
+      ) {
+        console.log(
+          `✅ Nominatim: ${nominatimData[0].lat}, ${nominatimData[0].lon}`
+        );
+        return {
+          lat: parseFloat(nominatimData[0].lat),
+          lng: parseFloat(nominatimData[0].lon),
+        };
+      }
+    }
+
+    console.log(`❌ Géocodage échoué pour: ${address}, ${city}`);
+    return null;
+  } catch (error) {
+    console.error("Erreur lors du géocodage:", error);
+    return null;
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     console.log("🧪 API /api/company/update appelée");
@@ -21,6 +78,7 @@ export async function PUT(request: NextRequest) {
       email,
       phone,
       address,
+      city,
       website,
       founded,
       size,
@@ -50,8 +108,19 @@ export async function PUT(request: NextRequest) {
     const userId = parseInt(session.user.id);
     console.log("👤 UserID récupéré:", userId);
 
+    // Géocodage automatique si l'adresse et la ville sont fournies
+    let coordinates = null;
+    if (address && city && address.trim() !== "" && city.trim() !== "") {
+      coordinates = await geocodeAddress(address.trim(), city.trim());
+      if (coordinates) {
+        console.log(
+          `📍 Coordonnées obtenues: Lat ${coordinates.lat}, Lng ${coordinates.lng}`
+        );
+      }
+    }
+
     // Préparer les données pour la mise à jour
-    const updateData = {
+    const updateData: any = {
       name: name.trim(),
       description: description?.trim() || null,
       logo: logo || null,
@@ -61,11 +130,17 @@ export async function PUT(request: NextRequest) {
       email: email?.trim() || null,
       phone: phone?.trim() || null,
       address: address?.trim() || null,
+      city: city?.trim() || null,
       website: website?.trim() || null,
       founded: founded?.trim() || null,
       size: size || null,
       updatedAt: new Date(),
     };
+
+    // Ajouter les coordonnées seulement si elles ont été géocodées
+    if (coordinates) {
+      updateData.coordinates = coordinates;
+    }
 
     console.log("💾 Mise à jour de l'entreprise dans la base de données...");
     console.log(

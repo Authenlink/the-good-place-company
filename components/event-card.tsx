@@ -1,334 +1,268 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Calendar,
   MapPin,
   Users,
+  Heart,
+  MessageCircle,
+  Share2,
   MoreHorizontal,
-  Eye,
-  Edit,
-  Trash2,
   Clock,
-  Euro,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { EVENT_TYPES, EventType, EventStatus } from "@/lib/schema";
-import { cn } from "@/lib/utils";
-
-interface Event {
-  id: number;
-  title: string;
-  description: string | null;
-  eventType: EventType;
-  startDate: string;
-  endDate: string | null;
-  location: string | null;
-  address: string | null;
-  city: string | null;
-  images: string[] | null;
-  maxParticipants: number | null;
-  isPaid?: boolean | null;
-  price?: string | null;
-  currency?: string | null;
-  fundraisingGoal?: string | null;
-  status: EventStatus;
-  companyId: number;
-  companyName: string | null;
-  companyLogo: string | null;
-  participantCount: number;
-  waitlistCount: number;
-  createdAt: string;
-}
+import { EVENT_TYPES } from "@/lib/schema";
 
 interface EventCardProps {
-  event: Event;
-  onView?: (event: Event) => void;
-  onEdit?: (event: Event) => void;
-  onDelete?: (eventId: number) => void;
-  showActions?: boolean;
+  event: {
+    id: number;
+    title: string;
+    description: string | null;
+    eventType: string;
+    startDate: Date;
+    endDate: Date | null;
+    location: string | null;
+    address: string | null;
+    city: string | null;
+    images: string[] | null;
+    maxParticipants: number | null;
+    isPaid: boolean;
+    price: string | null;
+    currency: string;
+    status: string;
+    companyName: string | null;
+    companyLogo: string | null;
+    participantCount: number;
+    waitlistCount: number;
+  };
 }
 
-// Couleurs par type d'événement
-const eventTypeColors: Record<EventType, string> = {
-  // Actions terrain
-  maraude: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  distribution_alimentaire:
-    "bg-green-500/10 text-green-600 border-green-500/20",
-  distribution_vetements: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  action_ecologique: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  benevolat: "bg-teal-500/10 text-teal-600 border-teal-500/20",
-  // Collecte & Financement
-  collecte_dons: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  collecte_fonds: "bg-pink-500/10 text-pink-600 border-pink-500/20",
-  soiree_caritative: "bg-rose-500/10 text-rose-600 border-rose-500/20",
-  vente_solidaire: "bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20",
-  concert_benefice: "bg-violet-500/10 text-violet-600 border-violet-500/20",
-  // Communauté
-  repas_partage: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  atelier: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
-  sensibilisation: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
-  // Autre
-  autre: "bg-gray-500/10 text-gray-600 border-gray-500/20",
-};
+export function EventCard({ event }: EventCardProps) {
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [showComments, setShowComments] = useState(false);
 
-// Couleurs par statut
-const statusColors: Record<EventStatus, string> = {
-  draft: "bg-gray-500/10 text-gray-600 border-gray-500/20",
-  published: "bg-green-500/10 text-green-600 border-green-500/20",
-  cancelled: "bg-red-500/10 text-red-600 border-red-500/20",
-  completed: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-};
+  const handleLike = () => {
+    setIsLiked(!isLiked);
+    setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
+  };
 
-const statusLabels: Record<EventStatus, string> = {
-  draft: "Brouillon",
-  published: "Publié",
-  cancelled: "Annulé",
-  completed: "Terminé",
-};
+  const formatEventDate = () => {
+    const now = new Date();
+    const startDate = new Date(event.startDate);
 
-export function EventCard({
-  event,
-  onView,
-  onEdit,
-  onDelete,
-  showActions = true,
-}: EventCardProps) {
-  const startDate = new Date(event.startDate);
-  const endDate = event.endDate ? new Date(event.endDate) : null;
-  const isPast = startDate < new Date();
-  const isFull = event.maxParticipants
-    ? event.participantCount >= event.maxParticipants
-    : false;
+    if (startDate < now) {
+      return `Passé - ${format(startDate, "dd/MM/yyyy", { locale: fr })}`;
+    }
 
-  // Calculer le pourcentage de remplissage
-  const fillPercentage = event.maxParticipants
-    ? Math.min((event.participantCount / event.maxParticipants) * 100, 100)
-    : 0;
+    const distance = formatDistanceToNow(startDate, { locale: fr });
+    return `Dans ${distance}`;
+  };
+
+  const formatEventTime = () => {
+    const startDate = new Date(event.startDate);
+    const endDate = event.endDate ? new Date(event.endDate) : null;
+
+    if (endDate) {
+      return `${format(startDate, "HH:mm", { locale: fr })} - ${format(
+        endDate,
+        "HH:mm",
+        { locale: fr }
+      )}`;
+    }
+    return format(startDate, "HH:mm", { locale: fr });
+  };
 
   return (
-    <Card
-      className={cn(
-        "w-full overflow-hidden transition-all hover:shadow-md",
-        isPast && "opacity-75"
-      )}
-    >
-      {/* Image de couverture */}
-      {event.images && event.images.length > 0 && (
-        <div className="relative h-40 w-full">
-          <Image
-            src={event.images[0]}
-            alt={event.title}
-            fill
-            className="object-cover"
-          />
-          <div className="absolute top-2 left-2 flex gap-2">
-            <Badge
-              variant="outline"
-              className={cn(
-                "backdrop-blur-sm bg-background/80",
-                eventTypeColors[event.eventType]
-              )}
-            >
-              {EVENT_TYPES[event.eventType]}
-            </Badge>
+    <Card className="w-full mb-6 overflow-hidden">
+      <CardContent className="p-0">
+        {/* Header avec avatar et nom */}
+        <div className="flex items-center justify-between p-4 sm:p-5 pb-3 sm:pb-4">
+          <div className="flex items-center space-x-3">
+            <Avatar className="h-9 w-9 sm:h-8 sm:w-8">
+              <AvatarImage
+                src={event.companyLogo || undefined}
+                alt={event.companyName || "Entreprise"}
+              />
+              <AvatarFallback>
+                {(event.companyName || "E").charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm sm:text-sm font-semibold text-foreground">
+                {event.companyName || "Entreprise"}
+              </p>
+              <p className="text-xs sm:text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(event.startDate), {
+                  addSuffix: true,
+                  locale: fr,
+                })}
+              </p>
+            </div>
           </div>
-          {event.status !== "published" && (
-            <div className="absolute top-2 right-2">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Image principale de l'événement */}
+        {event.images && event.images.length > 0 && (
+          <div className="relative aspect-[3/2] sm:aspect-[4/3]">
+            <Image
+              src={event.images[0]}
+              alt={event.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 400px"
+            />
+            {/* Badge de statut */}
+            <div className="absolute top-3 left-3">
               <Badge
-                variant="outline"
-                className={cn(
-                  "backdrop-blur-sm bg-background/80",
-                  statusColors[event.status]
-                )}
+                variant={
+                  new Date(event.startDate) > new Date()
+                    ? "default"
+                    : "secondary"
+                }
+                className="text-xs"
               >
-                {statusLabels[event.status]}
+                {new Date(event.startDate) > new Date() ? "À venir" : "Passé"}
               </Badge>
             </div>
-          )}
-        </div>
-      )}
-
-      <CardHeader className={cn("pb-2", !event.images?.length && "pt-4")}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            {/* Badges si pas d'image */}
-            {(!event.images || event.images.length === 0) && (
-              <div className="flex gap-2 mb-2 flex-wrap">
-                <Badge
-                  variant="outline"
-                  className={eventTypeColors[event.eventType]}
-                >
-                  {EVENT_TYPES[event.eventType]}
-                </Badge>
-                {event.status !== "published" && (
-                  <Badge
-                    variant="outline"
-                    className={statusColors[event.status]}
-                  >
-                    {statusLabels[event.status]}
-                  </Badge>
-                )}
-              </div>
-            )}
-            <h3 className="font-semibold text-lg leading-tight line-clamp-2">
-              {event.title}
-            </h3>
           </div>
-
-          {showActions && (onView || onEdit || onDelete) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {onView && (
-                  <DropdownMenuItem onClick={() => onView(event)}>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Voir les détails
-                  </DropdownMenuItem>
-                )}
-                {onEdit && (
-                  <DropdownMenuItem onClick={() => onEdit(event)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Modifier
-                  </DropdownMenuItem>
-                )}
-                {onDelete && (
-                  <DropdownMenuItem
-                    onClick={() => onDelete(event.id)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-0 space-y-3">
-        {/* Description tronquée */}
-        {event.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {event.description}
-          </p>
         )}
 
-        {/* Infos date et lieu */}
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4 flex-shrink-0" />
-            <span>{format(startDate, "EEEE d MMMM yyyy", { locale: fr })}</span>
+        {/* Contenu de l'événement */}
+        <div className="p-4 sm:p-5">
+          {/* Titre et type */}
+          <div className="mb-2 sm:mb-2">
+            <h3 className="text-lg sm:text-lg font-semibold text-foreground mb-1 sm:mb-1">
+              {event.title}
+            </h3>
+            <Badge variant="outline" className="text-xs">
+              {EVENT_TYPES[event.eventType as keyof typeof EVENT_TYPES] ||
+                event.eventType}
+            </Badge>
           </div>
 
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4 flex-shrink-0" />
-            <span>
-              {format(startDate, "HH:mm", { locale: fr })}
-              {endDate && ` - ${format(endDate, "HH:mm", { locale: fr })}`}
-            </span>
-          </div>
-
-          {(event.location || event.city) && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">
-                {[event.location, event.city].filter(Boolean).join(", ")}
-              </span>
-            </div>
-          )}
-
-          {/* Prix si événement payant */}
-          {event.isPaid && event.price && (
-            <div className="flex items-center gap-2">
-              <Euro className="h-4 w-4 flex-shrink-0 text-green-600" />
-              <span className="font-medium text-green-600">
-                {parseFloat(event.price).toFixed(2)} {event.currency || "EUR"}
-              </span>
-            </div>
-          )}
-
-          {/* Gratuit badge */}
-          {!event.isPaid && (
-            <div className="flex items-center gap-2">
-              <Euro className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-              <span className="text-muted-foreground">Gratuit</span>
-            </div>
-          )}
-        </div>
-
-        {/* Jauge de participants */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">
-                {event.participantCount} inscrit
-                {event.participantCount > 1 ? "s" : ""}
-              </span>
-              {event.maxParticipants && (
-                <span className="text-muted-foreground">
-                  / {event.maxParticipants}
+          {/* Informations organisées en deux colonnes */}
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            {/* Colonne gauche */}
+            <div className="space-y-2">
+              {/* Date */}
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {format(new Date(event.startDate), "EEEE dd MMMM yyyy", {
+                    locale: fr,
+                  })}
                 </span>
+              </div>
+
+              {/* Heure */}
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>{formatEventTime()}</span>
+              </div>
+
+              {/* Lieu */}
+              {(event.location || event.city) && (
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>
+                    {event.location && event.city
+                      ? `${event.location}, ${event.city}`
+                      : event.location || event.city}
+                  </span>
+                </div>
               )}
             </div>
-            {event.waitlistCount > 0 && (
-              <span className="text-xs text-muted-foreground">
-                +{event.waitlistCount} en attente
-              </span>
-            )}
+
+            {/* Colonne droite */}
+            <div className="space-y-2">
+              {/* Participants */}
+              <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                <Users className="h-4 w-4" />
+                <span>
+                  {event.participantCount}
+                  {event.maxParticipants && `/${event.maxParticipants}`}
+                  {event.waitlistCount > 0 &&
+                    ` (+${event.waitlistCount} en liste d'attente)`}
+                </span>
+              </div>
+
+              {/* Prix si payant */}
+              {event.isPaid && event.price && (
+                <Badge variant="secondary" className="text-xs">
+                  {event.price} {event.currency}
+                </Badge>
+              )}
+
+              {/* Dans X jours */}
+              <div className="text-xs text-muted-foreground">
+                ({formatEventDate()})
+              </div>
+            </div>
           </div>
 
-          {event.maxParticipants && (
-            <div className="h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  isFull ? "bg-orange-500" : "bg-primary"
-                )}
-                style={{ width: `${fillPercentage}%` }}
-              />
-            </div>
-          )}
-
-          {isFull && (
-            <p className="text-xs text-orange-600 font-medium">
-              Complet - Liste d'attente disponible
+          {/* Description */}
+          {event.description && (
+            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+              {event.description}
             </p>
           )}
         </div>
 
-        {/* Organisation */}
-        <div className="flex items-center gap-2 pt-2 border-t">
-          <Avatar className="h-6 w-6">
-            <AvatarImage
-              src={event.companyLogo || ""}
-              alt={event.companyName || ""}
-            />
-            <AvatarFallback className="text-xs">
-              {event.companyName?.charAt(0).toUpperCase() || "A"}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-sm text-muted-foreground truncate">
-            {event.companyName || "Association"}
-          </span>
+        {/* Actions */}
+        <div className="flex items-center justify-between px-4 py-3 border-t">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLike}
+              className={`p-0 h-8 w-8 ${
+                isLiked ? "text-red-500" : "text-muted-foreground"
+              } hover:text-red-500`}
+            >
+              <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowComments(!showComments)}
+              className="p-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+            >
+              <Share2 className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {likeCount > 0 && `${likeCount} like${likeCount > 1 ? "s" : ""}`}
+          </div>
         </div>
+
+        {/* Section commentaires (placeholder) */}
+        {showComments && (
+          <div className="px-4 pb-4 border-t bg-muted">
+            <div className="py-3">
+              <p className="text-xs text-muted-foreground text-center">
+                Commentaires en cours de développement...
+              </p>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

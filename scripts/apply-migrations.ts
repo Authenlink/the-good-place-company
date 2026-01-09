@@ -10,10 +10,10 @@ async function applyMigrations() {
 
     const sql = neon(process.env.DATABASE_URL!);
 
-    console.log("📋 Vérification de l'état actuel de la table posts...");
+    console.log("📋 Vérification de l'état actuel des tables...");
 
-    // Vérifier si les colonnes existent déjà
-    const columnsResult = await sql`
+    // Vérifier si les colonnes existent déjà dans posts
+    const postsColumnsResult = await sql`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'posts'
@@ -21,28 +21,59 @@ async function applyMigrations() {
       AND column_name IN ('company_id', 'images', 'updated_at')
     `;
 
-    const existingColumns = columnsResult.map(
+    const existingPostsColumns = postsColumnsResult.map(
       (row) => (row as any).column_name
     );
-    console.log("Colonnes existantes:", existingColumns);
+    console.log("Colonnes existantes dans posts:", existingPostsColumns);
 
-    // Appliquer les migrations manuellement
-    if (!existingColumns.includes("company_id")) {
+    // Vérifier si les colonnes city et coordinates existent dans companies
+    const companiesColumnsResult = await sql`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'companies'
+      AND table_schema = 'public'
+      AND column_name IN ('city', 'coordinates')
+    `;
+
+    const existingCompaniesColumns = companiesColumnsResult.map(
+      (row) => (row as any).column_name
+    );
+    console.log(
+      "Colonnes existantes dans companies:",
+      existingCompaniesColumns
+    );
+
+    // Appliquer les migrations manuellement pour posts
+    if (!existingPostsColumns.includes("company_id")) {
       console.log("➕ Ajout de la colonne company_id...");
       await sql`ALTER TABLE "posts" ADD COLUMN "company_id" integer REFERENCES "companies"("id")`;
       console.log("✅ Colonne company_id ajoutée");
     }
 
-    if (!existingColumns.includes("images")) {
+    if (!existingPostsColumns.includes("images")) {
       console.log("➕ Ajout de la colonne images...");
       await sql`ALTER TABLE "posts" ADD COLUMN "images" jsonb DEFAULT '[]'::jsonb`;
       console.log("✅ Colonne images ajoutée");
     }
 
-    if (!existingColumns.includes("updated_at")) {
+    if (!existingPostsColumns.includes("updated_at")) {
       console.log("➕ Ajout de la colonne updated_at...");
       await sql`ALTER TABLE "posts" ADD COLUMN "updated_at" timestamp DEFAULT now()`;
       console.log("✅ Colonne updated_at ajoutée");
+    }
+
+    // Ajouter la colonne city à companies si elle n'existe pas
+    if (!existingCompaniesColumns.includes("city")) {
+      console.log("➕ Ajout de la colonne city à la table companies...");
+      await sql`ALTER TABLE "companies" ADD COLUMN "city" text`;
+      console.log("✅ Colonne city ajoutée à la table companies");
+    }
+
+    // Ajouter la colonne coordinates à companies si elle n'existe pas
+    if (!existingCompaniesColumns.includes("coordinates")) {
+      console.log("➕ Ajout de la colonne coordinates à la table companies...");
+      await sql`ALTER TABLE "companies" ADD COLUMN "coordinates" jsonb`;
+      console.log("✅ Colonne coordinates ajoutée à la table companies");
     }
 
     // Vérifier si la table comments existe

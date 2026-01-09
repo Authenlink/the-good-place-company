@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
       accountType = "user",
       companyName,
       companyDescription,
+      companyAddress,
+      companyCity,
     } = body;
 
     // Validation de base
@@ -32,10 +34,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Si compte business, le nom de l'entreprise est requis
+    // Si compte business, le nom, l'adresse et la ville de l'entreprise sont requis
     if (accountType === "business" && !companyName) {
       return NextResponse.json(
         { error: "Company name is required for business accounts" },
+        { status: 400 }
+      );
+    }
+
+    if (accountType === "business" && (!companyAddress || !companyCity)) {
+      return NextResponse.json(
+        {
+          error: "Company address and city are required for business accounts",
+        },
         { status: 400 }
       );
     }
@@ -96,6 +107,8 @@ export async function POST(request: NextRequest) {
           userId: createdUser.id,
           name: companyName,
           description: companyDescription || null,
+          address: companyAddress,
+          city: companyCity,
         })
         .returning();
 

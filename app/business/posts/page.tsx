@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useScroll } from "@/hooks/use-scroll";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Plus, RefreshCw } from "lucide-react";
@@ -34,8 +33,8 @@ interface Post {
   companyId: number | null;
   userName: string | null;
   userImage: string | null;
-  companyName: string | null;
-  companyLogo: string | null;
+  companyName?: string;
+  companyLogo?: string;
   displayName?: string;
   displayImage?: string;
   isCompanyPost?: boolean;
@@ -47,7 +46,6 @@ export default function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const hasScrolled = useScroll();
 
   useEffect(() => {
     if (status === "loading") return;
@@ -139,7 +137,7 @@ export default function PostsPage() {
               <Skeleton className="h-4 w-32" />
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             <div className="grid gap-4 md:grid-cols-4">
               {[...Array(4)].map((_, i) => (
                 <Skeleton key={i} className="h-32 rounded-xl" />
@@ -155,11 +153,7 @@ export default function PostsPage() {
     <SidebarProvider>
       <DynamicSidebar />
       <SidebarInset>
-        <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
-            hasScrolled ? "border-b" : ""
-          }`}
-        >
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -181,7 +175,7 @@ export default function PostsPage() {
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           {/* Header */}
           <div className="flex justify-between items-center">
             <div>
@@ -268,15 +262,7 @@ export default function PostsPage() {
                 </Card>
               </div>
             ) : (
-              posts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  onComment={handleComment}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-              ))
+              posts.map((post) => <PostCard key={post.id} post={post} />)
             )}
           </div>
         </div>

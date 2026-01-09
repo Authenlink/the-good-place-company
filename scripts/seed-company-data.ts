@@ -26,14 +26,14 @@ async function seedCompanyData() {
     // Seed company values
     console.log("💎 Seeding company values...");
     const valuesData = [
-      { name: "Innovation" },
-      { name: "Durabilité" },
-      { name: "Excellence" },
-      { name: "Intégrité" },
-      { name: "Collaboration" },
-      { name: "Responsabilité sociale" },
-      { name: "Transparence" },
-      { name: "Qualité" },
+      { name: "Innovation", color: "bg-blue-500" },
+      { name: "Durabilité", color: "bg-green-500" },
+      { name: "Excellence", color: "bg-purple-500" },
+      { name: "Intégrité", color: "bg-red-500" },
+      { name: "Collaboration", color: "bg-orange-500" },
+      { name: "Responsabilité sociale", color: "bg-teal-500" },
+      { name: "Transparence", color: "bg-cyan-500" },
+      { name: "Qualité", color: "bg-pink-500" },
     ];
 
     for (const value of valuesData) {

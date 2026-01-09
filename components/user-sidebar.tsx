@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import {
-  Building2,
   Calendar,
-  Home,
-  Heart,
-  Settings,
-  Ticket,
+  Compass,
+  MapPin,
+  Newspaper,
+  User,
+  Users,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -26,88 +27,49 @@ import {
 
 const navItems = [
   {
-    title: "Feed",
+    title: "Actualités",
     url: "/feed",
-    icon: Home,
+    icon: Newspaper,
     isActive: true,
-    items: [
-      {
-        title: "For You",
-        url: "/feed",
-      },
-      {
-        title: "Latest",
-        url: "/feed/latest",
-      },
-    ],
   },
   {
-    title: "Events",
+    title: "Évènements",
     url: "/events",
     icon: Calendar,
     items: [
       {
-        title: "Discover",
+        title: "Tous les évènements",
         url: "/events",
       },
       {
-        title: "My Registrations",
-        url: "/events/registered",
+        title: "Calendrier des évènements",
+        url: "/events/calendar",
       },
       {
-        title: "Saved",
-        url: "/events/saved",
+        title: "Mes évènements",
+        url: "/events/my-events",
       },
     ],
   },
   {
-    title: "Companies",
-    url: "/companies",
-    icon: Building2,
-    items: [
-      {
-        title: "Discover",
-        url: "/companies",
-      },
-      {
-        title: "Following",
-        url: "/companies/following",
-      },
-    ],
+    title: "Associations",
+    url: "/associations",
+    icon: Users,
   },
   {
-    title: "My Activity",
-    url: "/activity",
-    icon: Ticket,
-    items: [
-      {
-        title: "Registrations",
-        url: "/activity/registrations",
-      },
-      {
-        title: "Favorites",
-        url: "/activity/favorites",
-      },
-    ],
+    title: "Découvrir",
+    url: "/discover",
+    icon: Compass,
   },
   {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-    items: [
-      {
-        title: "Profile",
-        url: "/settings/profile",
-      },
-      {
-        title: "Notifications",
-        url: "/settings/notifications",
-      },
-      {
-        title: "Privacy",
-        url: "/settings/privacy",
-      },
-    ],
+    title: "Carte",
+    url: "/map",
+    icon: MapPin,
+  },
+  {
+    title: "Profil",
+    url: "/profile",
+    icon: User,
   },
 ];
 
@@ -129,13 +91,19 @@ export function UserSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href="/feed">
-                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Heart className="size-4" />
+                <div className="flex aspect-square size-8 items-center justify-center">
+                  <Image
+                    src="/logo.png"
+                    alt="The Good Place"
+                    width={36}
+                    height={36}
+                    className="rounded-md"
+                  />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">The Good Place</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    User Account
+                    Portail Utilisateur
                   </span>
                 </div>
               </a>
@@ -147,7 +115,7 @@ export function UserSidebar({
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <NavUser user={user} accountType="user" />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

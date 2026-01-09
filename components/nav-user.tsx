@@ -40,12 +40,14 @@ function getInitials(name: string) {
 
 export function NavUser({
   user,
+  accountType = "user",
 }: {
   user: {
     name: string;
     email: string;
     avatar: string;
   };
+  accountType?: "user" | "business";
 }) {
   const { isMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
@@ -120,22 +122,33 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem
-                onClick={() =>
-                  (window.location.href = "/business/settings/profile")
-                }
-              >
-                <Building2 />
-                Profil entreprise
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  (window.location.href = "/business/settings/user-account")
-                }
-              >
-                <User />
-                Compte utilisateur
-              </DropdownMenuItem>
+              {accountType === "business" ? (
+                <>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      (window.location.href = "/business/settings/profile")
+                    }
+                  >
+                    <Building2 />
+                    Profil entreprise
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      (window.location.href = "/business/settings/user-account")
+                    }
+                  >
+                    <User />
+                    Compte utilisateur
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => (window.location.href = "/profile")}
+                >
+                  <User />
+                  Profil
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem>
                 <Bell />
                 Notifications

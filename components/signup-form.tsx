@@ -33,6 +33,8 @@ export function SignupForm({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [companyCity, setCompanyCity] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -56,6 +58,14 @@ export function SignupForm({
       return;
     }
 
+    if (
+      accountType === "business" &&
+      (!companyAddress.trim() || !companyCity.trim())
+    ) {
+      setError("L'adresse et la ville de l'entreprise sont requises");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -71,6 +81,9 @@ export function SignupForm({
           password,
           accountType,
           companyName: accountType === "business" ? companyName : undefined,
+          companyAddress:
+            accountType === "business" ? companyAddress : undefined,
+          companyCity: accountType === "business" ? companyCity : undefined,
         }),
       });
 
@@ -179,20 +192,52 @@ export function SignupForm({
 
               {/* Business-specific fields */}
               {accountType === "business" && (
-                <Field>
-                  <FieldLabel htmlFor="companyName">
-                    Nom de l&apos;entreprise
-                  </FieldLabel>
-                  <Input
-                    id="companyName"
-                    type="text"
-                    placeholder="The Good Place Company"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    required
-                    disabled={isLoading}
-                  />
-                </Field>
+                <>
+                  <Field>
+                    <FieldLabel htmlFor="companyName">
+                      Nom de l&apos;entreprise
+                    </FieldLabel>
+                    <Input
+                      id="companyName"
+                      type="text"
+                      placeholder="The Good Place Company"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      required
+                      disabled={isLoading}
+                    />
+                  </Field>
+                  <Field>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Field>
+                        <FieldLabel htmlFor="companyAddress">
+                          Adresse de l&apos;entreprise
+                        </FieldLabel>
+                        <Input
+                          id="companyAddress"
+                          type="text"
+                          placeholder="123 Rue de l'Innovation"
+                          value={companyAddress}
+                          onChange={(e) => setCompanyAddress(e.target.value)}
+                          required
+                          disabled={isLoading}
+                        />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="companyCity">Ville</FieldLabel>
+                        <Input
+                          id="companyCity"
+                          type="text"
+                          placeholder="Paris"
+                          value={companyCity}
+                          onChange={(e) => setCompanyCity(e.target.value)}
+                          required
+                          disabled={isLoading}
+                        />
+                      </Field>
+                    </div>
+                  </Field>
+                </>
               )}
 
               <Field>

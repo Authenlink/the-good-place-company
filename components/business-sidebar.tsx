@@ -167,7 +167,7 @@ export function BusinessSidebar({
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <NavUser user={user} accountType="business" />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

@@ -58,7 +58,7 @@ export function LoginForm({
         if (session?.user?.accountType === "business") {
           router.push("/business/dashboard");
         } else {
-          router.push("/dashboard");
+          router.push("/feed");
         }
         router.refresh();
       }
