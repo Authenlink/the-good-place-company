@@ -27,6 +27,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { EventValidationDialog } from "@/components/event-validation-dialog";
 
 interface Follower {
   id: number;
@@ -307,6 +308,7 @@ export default function FollowersPage() {
           )}
         </div>
       </SidebarInset>
+      <EventValidationDialog />
     </SidebarProvider>
   );
 }

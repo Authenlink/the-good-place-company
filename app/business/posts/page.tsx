@@ -24,6 +24,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useScroll } from "@/hooks/use-scroll";
+import { EventValidationDialog } from "@/components/event-validation-dialog";
 
 interface Post {
   id: number;
@@ -273,6 +274,7 @@ export default function PostsPage() {
           </div>
         </div>
       </SidebarInset>
+      <EventValidationDialog />
     </SidebarProvider>
   );
 }

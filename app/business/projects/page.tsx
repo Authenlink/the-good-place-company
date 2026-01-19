@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectStatus } from "@/lib/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useScroll } from "@/hooks/use-scroll";
+import { EventValidationDialog } from "@/components/event-validation-dialog";
 
 interface Project {
   id: number;
@@ -366,6 +367,7 @@ export default function ProjectsPage() {
           </Tabs>
         </div>
       </SidebarInset>
+      <EventValidationDialog />
     </SidebarProvider>
   );
 }

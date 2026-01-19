@@ -49,6 +49,7 @@ export interface CalendarEvent {
   participantCount?: number;
   maxParticipants?: number | null;
   status: string;
+  participantStatus?: "confirmed" | "waitlisted"; // Statut de participation de l'utilisateur
 }
 
 interface EventCalendarProps {
@@ -157,12 +158,21 @@ const eventTypeBadgeColors: Record<EventType, string> = {
   autre: "bg-gray-500/10 text-gray-600 border-gray-500/20",
 };
 
-// Helper pour obtenir les événements d'un jour
+// Helper pour obtenir les événements d'un jour (dédupliqués par ID)
 function getEventsForDay(events: CalendarEvent[], date: Date): CalendarEvent[] {
-  return events.filter((event) => {
+  const eventsMap = new Map<number, CalendarEvent>();
+  
+  events.forEach((event) => {
     const eventDate = new Date(event.startDate);
-    return isSameDay(eventDate, date);
+    if (isSameDay(eventDate, date)) {
+      // Utiliser un Map pour éviter les doublons par ID
+      if (!eventsMap.has(event.id)) {
+        eventsMap.set(event.id, event);
+      }
+    }
   });
+  
+  return Array.from(eventsMap.values());
 }
 
 // Composant Skeleton
@@ -452,7 +462,20 @@ function CalendarGrid({
   );
 }
 
-// Cellule d'un jour avec mini-cartes d'événements
+// Helper pour obtenir la couleur du badge selon le nombre d'événements
+function getEventCountBadgeColor(count: number): string {
+  if (count === 0) {
+    return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700";
+  } else if (count <= 2) {
+    return "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800";
+  } else if (count <= 5) {
+    return "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800";
+  } else {
+    return "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800";
+  }
+}
+
+// Cellule d'un jour avec badge de nombre d'événements
 function DayCell({
   date,
   events,
@@ -470,9 +493,8 @@ function DayCell({
   onSelect: () => void;
   onEventClick?: (event: CalendarEvent) => void;
 }) {
-  // Sur mobile, montrer seulement 1 événement, sur desktop 2
-  const maxEventsToShowMobile = 1;
-  const maxEventsToShowDesktop = 2;
+  const eventCount = events.length;
+  const badgeColor = getEventCountBadgeColor(eventCount);
 
   return (
     <div
@@ -496,45 +518,18 @@ function DayCell({
         {format(date, "d")}
       </div>
 
-      {/* Mini-cartes d'événements - Version mobile */}
-      <div className="space-y-0.5 sm:hidden">
-        {events.slice(0, maxEventsToShowMobile).map((event) => (
-          <MiniEventCard
-            key={event.id}
-            event={event}
-            compact
-            onClick={(e) => {
-              e.stopPropagation();
-              onEventClick?.(event);
-            }}
-          />
-        ))}
-        {events.length > maxEventsToShowMobile && (
-          <div className="text-[8px] text-muted-foreground px-0.5 font-medium">
-            +{events.length - maxEventsToShowMobile}
-          </div>
-        )}
-      </div>
-
-      {/* Mini-cartes d'événements - Version desktop */}
-      <div className="space-y-0.5 hidden sm:block">
-        {events.slice(0, maxEventsToShowDesktop).map((event) => (
-          <MiniEventCard
-            key={event.id}
-            event={event}
-            onClick={(e) => {
-              e.stopPropagation();
-              onEventClick?.(event);
-            }}
-          />
-        ))}
-        {events.length > maxEventsToShowDesktop && (
-          <div className="text-[10px] text-muted-foreground px-1 font-medium">
-            +{events.length - maxEventsToShowDesktop} autre
-            {events.length - maxEventsToShowDesktop > 1 ? "s" : ""}
-          </div>
-        )}
-      </div>
+      {/* Badge avec le nombre d'événements */}
+      {eventCount > 0 && (
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-[9px] sm:text-[10px] font-semibold px-1 sm:px-1.5 py-0 border",
+            badgeColor
+          )}
+        >
+          {eventCount}
+        </Badge>
+      )}
     </div>
   );
 }
@@ -648,13 +643,28 @@ function EventDetailItem({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge
               variant="outline"
               className={cn("text-xs", eventTypeBadgeColors[event.eventType])}
             >
               {EVENT_TYPES[event.eventType]}
             </Badge>
+            {event.participantStatus && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-xs",
+                  event.participantStatus === "confirmed"
+                    ? "bg-green-500/10 text-green-600 border-green-500/20"
+                    : "bg-orange-500/10 text-orange-600 border-orange-500/20"
+                )}
+              >
+                {event.participantStatus === "confirmed"
+                  ? "Confirmé"
+                  : "Liste d'attente"}
+              </Badge>
+            )}
             {event.participantCount !== undefined && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Users className="h-3 w-3" />

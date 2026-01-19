@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { events, companies, eventParticipants, users } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 
 // GET - Détail d'un événement
@@ -39,9 +39,14 @@ export async function GET(
         city: events.city,
         coordinates: events.coordinates,
         images: events.images,
+        coverImage: events.coverImage,
+        backgroundType: events.backgroundType,
+        backgroundImageIndex: events.backgroundImageIndex,
+        backgroundGradient: events.backgroundGradient,
         maxParticipants: events.maxParticipants,
         recurrence: events.recurrence,
         recurrenceEndDate: events.recurrenceEndDate,
+        recurrenceGroupId: events.recurrenceGroupId,
         isPaid: events.isPaid,
         price: events.price,
         currency: events.currency,
@@ -160,9 +165,12 @@ export async function PUT(
 
     const companyId = companyResult[0].id;
 
-    // Vérifier que l'événement appartient à cette entreprise
+    // Vérifier que l'événement appartient à cette entreprise et récupérer ses infos
     const eventCheck = await db
-      .select({ id: events.id })
+      .select({ 
+        id: events.id,
+        recurrenceGroupId: events.recurrenceGroupId,
+      })
       .from(events)
       .where(and(eq(events.id, eventIdNum), eq(events.companyId, companyId)))
       .limit(1);
@@ -172,6 +180,27 @@ export async function PUT(
         { error: "Événement non trouvé ou accès non autorisé" },
         { status: 404 }
       );
+    }
+
+    const event = eventCheck[0];
+    let groupIdToUpdate: number | null = null;
+
+    // Déterminer le groupe à mettre à jour
+    if (event.recurrenceGroupId) {
+      // L'événement fait partie d'une série, mettre à jour toute la série
+      groupIdToUpdate = event.recurrenceGroupId;
+    } else {
+      // Vérifier si c'est le premier événement d'une série (a des événements qui le référencent)
+      const linkedEvents = await db
+        .select({ id: events.id })
+        .from(events)
+        .where(eq(events.recurrenceGroupId, eventIdNum))
+        .limit(1);
+
+      if (linkedEvents.length > 0) {
+        // C'est le premier événement d'une série, mettre à jour toute la série
+        groupIdToUpdate = eventIdNum;
+      }
     }
 
     const body = await request.json();
@@ -186,9 +215,22 @@ export async function PUT(
       city,
       coordinates,
       images,
+      coverImage,
+      backgroundType,
+      backgroundImageIndex,
+      backgroundGradient,
       maxParticipants,
       recurrence,
       recurrenceEndDate,
+      isPaid,
+      price,
+      currency,
+      fundraisingGoal,
+      requirements,
+      targetAudience,
+      contactEmail,
+      contactPhone,
+      externalLink,
       status,
     } = body;
 
@@ -200,38 +242,82 @@ export async function PUT(
       );
     }
 
-    // Mettre à jour l'événement
-    const updatedEvent = await db
-      .update(events)
-      .set({
-        ...(title !== undefined && { title: title.trim() }),
-        ...(description !== undefined && {
-          description: description?.trim() || null,
-        }),
-        ...(eventType !== undefined && { eventType }),
+    // Préparer les champs à mettre à jour (sans les dates qui sont spécifiques à chaque événement)
+    const updateFields: any = {
+      ...(title !== undefined && { title: title.trim() }),
+      ...(description !== undefined && {
+        description: description?.trim() || null,
+      }),
+      ...(eventType !== undefined && { eventType }),
+      ...(location !== undefined && { location: location?.trim() || null }),
+      ...(address !== undefined && { address: address?.trim() || null }),
+      ...(city !== undefined && { city: city?.trim() || null }),
+      ...(coordinates !== undefined && { coordinates }),
+      ...(images !== undefined && { images }),
+      ...(coverImage !== undefined && { coverImage: coverImage?.trim() || null }),
+      ...(backgroundType !== undefined && { backgroundType }),
+      ...(backgroundImageIndex !== undefined && { backgroundImageIndex }),
+      ...(backgroundGradient !== undefined && { backgroundGradient }),
+      ...(maxParticipants !== undefined && { maxParticipants }),
+      ...(recurrence !== undefined && { recurrence }),
+      ...(recurrenceEndDate !== undefined && {
+        recurrenceEndDate: recurrenceEndDate
+          ? new Date(recurrenceEndDate)
+          : null,
+      }),
+      ...(isPaid !== undefined && { isPaid }),
+      ...(price !== undefined && { price: price ? String(price) : null }),
+      ...(currency !== undefined && { currency }),
+      ...(fundraisingGoal !== undefined && { 
+        fundraisingGoal: fundraisingGoal ? String(fundraisingGoal) : null 
+      }),
+      ...(requirements !== undefined && { requirements: requirements?.trim() || null }),
+      ...(targetAudience !== undefined && { targetAudience: targetAudience?.trim() || null }),
+      ...(contactEmail !== undefined && { contactEmail: contactEmail?.trim() || null }),
+      ...(contactPhone !== undefined && { contactPhone: contactPhone?.trim() || null }),
+      ...(externalLink !== undefined && { externalLink: externalLink?.trim() || null }),
+      ...(status !== undefined && { status }),
+      updatedAt: new Date(),
+    };
+
+    // Mettre à jour tous les événements du groupe (sans modifier les dates individuelles)
+    if (groupIdToUpdate !== null) {
+      await db
+        .update(events)
+        .set(updateFields)
+        .where(
+          or(
+            eq(events.id, groupIdToUpdate),
+            eq(events.recurrenceGroupId, groupIdToUpdate)
+          )
+        );
+
+      // Récupérer l'événement mis à jour pour la réponse
+      const updatedEvent = await db
+        .select()
+        .from(events)
+        .where(eq(events.id, eventIdNum))
+        .limit(1);
+
+      return NextResponse.json(updatedEvent[0]);
+    } else {
+      // Événement unique, mettre à jour normalement (y compris les dates)
+      const updateFieldsWithDates = {
+        ...updateFields,
         ...(startDate !== undefined && { startDate: new Date(startDate) }),
         ...(endDate !== undefined && {
           endDate: endDate ? new Date(endDate) : null,
         }),
-        ...(location !== undefined && { location: location?.trim() || null }),
-        ...(address !== undefined && { address: address?.trim() || null }),
-        ...(city !== undefined && { city: city?.trim() || null }),
-        ...(coordinates !== undefined && { coordinates }),
-        ...(images !== undefined && { images }),
-        ...(maxParticipants !== undefined && { maxParticipants }),
-        ...(recurrence !== undefined && { recurrence }),
-        ...(recurrenceEndDate !== undefined && {
-          recurrenceEndDate: recurrenceEndDate
-            ? new Date(recurrenceEndDate)
-            : null,
-        }),
-        ...(status !== undefined && { status }),
-        updatedAt: new Date(),
-      })
-      .where(eq(events.id, eventIdNum))
-      .returning();
+      };
 
-    return NextResponse.json(updatedEvent[0]);
+      const updatedEvent = await db
+        .update(events)
+        .set(updateFieldsWithDates)
+        .where(eq(events.id, eventIdNum))
+        .returning();
+
+      return NextResponse.json(updatedEvent[0]);
+    }
   } catch (error) {
     console.error("Erreur lors de la modification de l'événement:", error);
     return NextResponse.json(
@@ -285,9 +371,12 @@ export async function DELETE(
 
     const companyId = companyResult[0].id;
 
-    // Vérifier que l'événement appartient à cette entreprise
+    // Vérifier que l'événement appartient à cette entreprise et récupérer ses infos
     const eventCheck = await db
-      .select({ id: events.id })
+      .select({ 
+        id: events.id,
+        recurrenceGroupId: events.recurrenceGroupId,
+      })
       .from(events)
       .where(and(eq(events.id, eventIdNum), eq(events.companyId, companyId)))
       .limit(1);
@@ -299,8 +388,40 @@ export async function DELETE(
       );
     }
 
-    // Supprimer l'événement (les participants seront supprimés en cascade)
-    await db.delete(events).where(eq(events.id, eventIdNum));
+    const event = eventCheck[0];
+    let groupIdToDelete: number | null = null;
+
+    // Déterminer le groupe à supprimer
+    if (event.recurrenceGroupId) {
+      // L'événement fait partie d'une série, supprimer toute la série
+      groupIdToDelete = event.recurrenceGroupId;
+    } else {
+      // Vérifier si c'est le premier événement d'une série (a des événements qui le référencent)
+      const linkedEvents = await db
+        .select({ id: events.id })
+        .from(events)
+        .where(eq(events.recurrenceGroupId, eventIdNum))
+        .limit(1);
+
+      if (linkedEvents.length > 0) {
+        // C'est le premier événement d'une série, supprimer toute la série
+        groupIdToDelete = eventIdNum;
+      }
+    }
+
+    // Supprimer tous les événements du groupe
+    if (groupIdToDelete !== null) {
+      // Supprimer le premier événement et tous ceux qui le référencent
+      await db.delete(events).where(
+        or(
+          eq(events.id, groupIdToDelete),
+          eq(events.recurrenceGroupId, groupIdToDelete)
+        )
+      );
+    } else {
+      // Événement unique, supprimer seulement celui-ci
+      await db.delete(events).where(eq(events.id, eventIdNum));
+    }
 
     return NextResponse.json({ message: "Événement supprimé avec succès" });
   } catch (error) {

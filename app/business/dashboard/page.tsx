@@ -44,6 +44,7 @@ import {
   type CalendarEvent,
 } from "@/components/event-calendar";
 import { useScroll } from "@/hooks/use-scroll";
+import { EventValidationDialog } from "@/components/event-validation-dialog";
 
 interface Event {
   id: number;
@@ -399,6 +400,7 @@ export default function BusinessDashboardPage() {
           </div>
         </div>
       </SidebarInset>
+      <EventValidationDialog />
     </SidebarProvider>
   );
 }

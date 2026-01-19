@@ -427,7 +427,7 @@ export default function MapComponent({
                     className="w-full"
                     onClick={() => {
                       // Fermer le popup et naviguer vers la page de l'entreprise
-                      window.open(`/company/${marker.company.id}`, "_blank");
+                      window.open(`/associations/${encodeURIComponent(marker.company.name)}`, "_blank");
                     }}
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />

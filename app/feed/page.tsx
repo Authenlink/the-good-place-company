@@ -49,6 +49,7 @@ interface Event {
   price: string | null;
   currency: string;
   status: string;
+  companyId: number;
   companyName: string | null;
   companyLogo: string | null;
   participantCount: number;

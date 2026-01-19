@@ -19,6 +19,8 @@ export async function GET(
         description: companies.description,
         logo: companies.logo,
         background: companies.background,
+        backgroundType: companies.backgroundType,
+        backgroundGradient: companies.backgroundGradient,
         address: companies.address,
         city: companies.city,
         coordinates: companies.coordinates,
@@ -29,6 +31,10 @@ export async function GET(
         size: companies.size,
         areaId: companies.areaId,
         values: companies.values,
+        isOnline: companies.isOnline,
+        instagramUrl: companies.instagramUrl,
+        tiktokUrl: companies.tiktokUrl,
+        linkedinUrl: companies.linkedinUrl,
         createdAt: companies.createdAt,
       })
       .from(companies)
@@ -90,6 +96,9 @@ export async function GET(
       description: associationData.description || "",
       logo: associationData.logo,
       banner: associationData.background, // background devient banner pour le frontend
+      background: associationData.background,
+      backgroundType: associationData.backgroundType,
+      backgroundGradient: associationData.backgroundGradient,
       address: associationData.address,
       city: associationData.city,
       coordinates: associationData.coordinates,
@@ -97,8 +106,13 @@ export async function GET(
       phone: associationData.phone,
       website: associationData.website,
       founded: associationData.founded,
+      size: associationData.size,
       category: category,
       values: valueNames,
+      isOnline: associationData.isOnline || false,
+      instagramUrl: associationData.instagramUrl || "",
+      tiktokUrl: associationData.tiktokUrl || "",
+      linkedinUrl: associationData.linkedinUrl || "",
       createdAt: associationData.createdAt?.toISOString() || "",
     };
 

@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { EventValidationDialog } from "@/components/event-validation-dialog";
 
 interface StatsData {
   kpis: {
@@ -420,6 +421,7 @@ export default function FollowersInsightsPage() {
           </Card>
         </div>
       </SidebarInset>
+      <EventValidationDialog />
     </SidebarProvider>
   );
 }

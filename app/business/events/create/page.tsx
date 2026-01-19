@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -16,6 +16,7 @@ import {
   Phone,
   Mail,
   Link as LinkIcon,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +62,8 @@ import {
   RecurrenceType,
   EventType,
 } from "@/lib/schema";
+import { BackgroundSelector } from "@/components/background-selector";
+import { generateRandomGradient, type Gradient } from "@/lib/gradient-generator";
 
 export default function CreateEventPage() {
   const { data: session, status } = useSession();
@@ -103,6 +106,21 @@ export default function CreateEventPage() {
   // Images
   const [images, setImages] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  // Background - Générer un gradient initial
+  const [backgroundType, setBackgroundType] = useState<"image" | "gradient" | null>("gradient");
+  const [backgroundImageIndex, setBackgroundImageIndex] = useState<number | null>(null);
+  const [backgroundGradient, setBackgroundGradient] = useState<Gradient | null>(null);
+
+  // Générer un gradient initial au chargement
+  useEffect(() => {
+    if (!backgroundGradient) {
+      const initialGradient = generateRandomGradient();
+      setBackgroundGradient(initialGradient);
+    }
+  }, []);
 
   // Soumission
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -202,6 +220,94 @@ export default function CreateEventPage() {
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
+    // Si l'image supprimée était sélectionnée comme background, réinitialiser
+    if (backgroundImageIndex === index && backgroundType === "image") {
+      setBackgroundType("gradient");
+      setBackgroundImageIndex(null);
+    } else if (backgroundImageIndex !== null && backgroundImageIndex > index) {
+      // Ajuster l'index si nécessaire
+      setBackgroundImageIndex(backgroundImageIndex - 1);
+    }
+  };
+
+  const handleCoverUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Type de fichier invalide",
+        description: "Utilisez uniquement JPG, PNG ou WebP.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > maxSize) {
+      toast({
+        title: "Fichier trop volumineux",
+        description: "La taille maximale est de 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingCover(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "event");
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Erreur lors de l'upload");
+      }
+
+      setCoverImage(result.url);
+      // Si une cover est uploadée, la sélectionner automatiquement comme background
+      setBackgroundType("image");
+      setBackgroundImageIndex(null); // null signifie que c'est la cover
+
+      toast({
+        title: "Image de cover ajoutée",
+        description: "L'image de cover a été ajoutée avec succès.",
+      });
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Erreur d'upload",
+        description: "Une erreur s'est produite lors de l'upload de l'image de cover.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingCover(false);
+      event.target.value = "";
+    }
+  };
+
+  const removeCoverImage = () => {
+    setCoverImage(null);
+    // Si la cover était sélectionnée comme background, revenir au gradient
+    if (backgroundType === "image" && backgroundImageIndex === null) {
+      setBackgroundType("gradient");
+    }
   };
 
   const handleSubmit = async () => {
@@ -228,6 +334,10 @@ export default function CreateEventPage() {
       errors.push("Prix (événement payant)");
     }
 
+    if (recurrence !== "none" && !recurrenceEndDate) {
+      errors.push("Date de fin de récurrence");
+    }
+
     // Si des erreurs, afficher un toast avec la liste
     if (errors.length > 0) {
       toast({
@@ -239,7 +349,7 @@ export default function CreateEventPage() {
     }
 
     // Vérifier si on est en train d'uploader
-    if (uploadingImages) {
+    if (uploadingImages || uploadingCover) {
       toast({
         title: "Upload en cours",
         description: "Veuillez attendre la fin de l'upload des images.",
@@ -269,6 +379,12 @@ export default function CreateEventPage() {
         address: address.trim() || null,
         city: city.trim() || null,
         images,
+        coverImage: coverImage || null,
+        backgroundType,
+        // Si backgroundType est "image" et backgroundImageIndex est null, c'est la cover
+        // Sinon, c'est une image de la galerie
+        backgroundImageIndex: backgroundType === "image" ? backgroundImageIndex : null,
+        backgroundGradient: backgroundType === "gradient" ? backgroundGradient : null,
         maxParticipants: maxParticipants ? parseInt(maxParticipants) : null,
         recurrence,
         recurrenceEndDate: recurrenceEndDate
@@ -720,78 +836,210 @@ export default function CreateEventPage() {
 
             {/* Colonne latérale */}
             <div className="space-y-6">
-              {/* Images */}
+              {/* Images et Cover */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Camera className="h-5 w-5" />
-                    Images
+                    Images et Cover
                   </CardTitle>
                   <CardDescription>
                     Ajoutez des visuels pour votre événement
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {images.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {images.map((image, index) => (
-                        <div key={index} className="relative group">
-                          <div className="aspect-video rounded-lg overflow-hidden border">
-                            <Image
-                              src={image}
-                              alt={`Image ${index + 1}`}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => removeImage(index)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
+                <CardContent className="space-y-6">
+                  {/* Section Images de l'événement */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">
+                        Images de l&apos;événement
+                      </Label>
+                      <span className="text-xs text-muted-foreground">
+                        {images.length}/4
+                      </span>
                     </div>
-                  )}
-
-                  {images.length < 4 && (
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
-                      <div className="text-center space-y-3">
-                        <Camera className="h-8 w-8 mx-auto text-muted-foreground" />
-                        <div>
-                          <Label
-                            htmlFor="image-upload"
-                            className="cursor-pointer"
-                          >
-                            <span className="text-sm font-medium hover:underline">
-                              Ajouter des images
-                            </span>
-                            <Input
-                              id="image-upload"
-                              type="file"
-                              accept="image/jpeg,image/jpg,image/png,image/webp"
-                              multiple
-                              onChange={handleImageUpload}
-                              className="hidden"
-                              disabled={uploadingImages}
-                            />
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Max 5MB • {4 - images.length} restantes
-                          </p>
-                        </div>
-                        {uploadingImages && (
-                          <div className="flex items-center justify-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span className="text-sm">Upload...</span>
+                    {images.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {images.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-video rounded-lg overflow-hidden border">
+                              <Image
+                                src={image}
+                                alt={`Image ${index + 1}`}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeImage(index)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
-                        )}
+                        ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {images.length < 4 && (
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                        <div className="text-center space-y-2">
+                          <Camera className="h-6 w-6 mx-auto text-muted-foreground" />
+                          <div>
+                            <Label
+                              htmlFor="image-upload"
+                              className="cursor-pointer"
+                            >
+                              <span className="text-sm font-medium hover:underline">
+                                Ajouter des images
+                              </span>
+                              <Input
+                                id="image-upload"
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                multiple
+                                onChange={handleImageUpload}
+                                className="hidden"
+                                disabled={uploadingImages}
+                              />
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Max 5MB • {4 - images.length} restantes
+                            </p>
+                          </div>
+                          {uploadingImages && (
+                            <div className="flex items-center justify-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Upload...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Section Image de cover */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">
+                      Image de cover
+                    </Label>
+                    {coverImage ? (
+                      <div className="relative group">
+                        <div className="aspect-video rounded-lg overflow-hidden border">
+                          <Image
+                            src={coverImage}
+                            alt="Cover"
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={removeCoverImage}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Supprimer
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                        <div className="text-center space-y-2">
+                          <ImageIcon className="h-6 w-6 mx-auto text-muted-foreground" />
+                          <div>
+                            <Label
+                              htmlFor="cover-upload"
+                              className="cursor-pointer"
+                            >
+                              <span className="text-sm font-medium hover:underline">
+                                Ajouter une image de cover
+                              </span>
+                              <Input
+                                id="cover-upload"
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                onChange={handleCoverUpload}
+                                className="hidden"
+                                disabled={uploadingCover}
+                              />
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Max 5MB • Optionnel
+                            </p>
+                          </div>
+                          {uploadingCover && (
+                            <div className="flex items-center justify-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Upload...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Sélecteur de background - Toujours visible */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">
+                      Background de l&apos;événement
+                    </Label>
+                    <BackgroundSelector
+                      images={
+                        coverImage
+                          ? [coverImage, ...images] // Cover en premier si elle existe
+                          : images
+                      }
+                      backgroundType={backgroundType}
+                      backgroundImageIndex={
+                        backgroundType === "image"
+                          ? coverImage && backgroundImageIndex === null
+                            ? 0 // Cover est à l'index 0 si elle existe
+                            : coverImage && backgroundImageIndex !== null
+                            ? backgroundImageIndex + 1 // Ajuster l'index car cover est à l'index 0
+                            : backgroundImageIndex
+                          : null
+                      }
+                      backgroundGradient={backgroundGradient}
+                      onBackgroundTypeChange={(type) => {
+                        setBackgroundType(type);
+                        // Si on passe à gradient, réinitialiser l'index
+                        if (type === "gradient") {
+                          setBackgroundImageIndex(null);
+                        }
+                        // Si on passe à image et qu'il y a une cover, la sélectionner par défaut
+                        if (type === "image" && coverImage && backgroundImageIndex === null) {
+                          // Garder null pour indiquer que c'est la cover
+                        } else if (type === "image" && images.length > 0 && backgroundImageIndex === null) {
+                          // Si pas de cover mais des images, sélectionner la première
+                          setBackgroundImageIndex(0);
+                        }
+                      }}
+                      onBackgroundImageIndexChange={(index) => {
+                        if (index === null) {
+                          setBackgroundImageIndex(null);
+                        } else if (coverImage && index === 0) {
+                          // Index 0 = cover
+                          setBackgroundImageIndex(null);
+                        } else if (coverImage && index > 0) {
+                          // Index > 0 = image de la galerie (index - 1 dans le tableau images)
+                          setBackgroundImageIndex(index - 1);
+                        } else {
+                          // Pas de cover, index direct dans images
+                          setBackgroundImageIndex(index);
+                        }
+                        setBackgroundType("image");
+                      }}
+                      onBackgroundGradientChange={setBackgroundGradient}
+                      showPreview={true}
+                    />
+                  </div>
                 </CardContent>
               </Card>
 

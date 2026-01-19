@@ -626,7 +626,7 @@ export default function MapClient({
 
   const handleViewProfile = useCallback(
     (companyName: string) => {
-      router.push(`/company/${encodeURIComponent(companyName)}`);
+      router.push(`/associations/${encodeURIComponent(companyName)}`);
     },
     [router]
   );

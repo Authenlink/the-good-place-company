@@ -4,12 +4,10 @@ import * as React from "react";
 import Image from "next/image";
 import {
   BarChart3,
-  Calendar,
-  FolderKanban,
-  LayoutDashboard,
+  Calendar, LayoutDashboard,
   MessageSquare,
   Settings,
-  Users,
+  Users
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -52,25 +50,25 @@ const navItems = [
       },
     ],
   },
-  {
-    title: "Projets",
-    url: "/business/projects",
-    icon: FolderKanban,
-    items: [
-      {
-        title: "Tous les projets",
-        url: "/business/projects",
-      },
-      {
-        title: "Créer un projet",
-        url: "/business/projects/create",
-      },
-      {
-        title: "Archivés",
-        url: "/business/projects/archived",
-      },
-    ],
-  },
+  // {
+  //   title: "Projets",
+  //   url: "/business/projects",
+  //   icon: FolderKanban,
+  //   items: [
+  //     {
+  //       title: "Tous les projets",
+  //       url: "/business/projects",
+  //     },
+  //     {
+  //       title: "Créer un projet",
+  //       url: "/business/projects/create",
+  //     },
+  //     {
+  //       title: "Archivés",
+  //       url: "/business/projects/archived",
+  //     },
+  //   ],
+  // },
   {
     title: "Posts",
     url: "/business/posts",

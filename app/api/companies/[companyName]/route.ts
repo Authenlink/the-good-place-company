@@ -29,6 +29,8 @@ export async function GET(
         description: companies.description,
         logo: companies.logo,
         background: companies.background,
+        backgroundType: companies.backgroundType,
+        backgroundGradient: companies.backgroundGradient,
         address: companies.address,
         city: companies.city,
         coordinates: companies.coordinates,

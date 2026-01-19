@@ -5,6 +5,7 @@ import Image from "next/image";
 import {
   Calendar,
   Compass,
+  LayoutDashboard,
   MapPin,
   Newspaper,
   User,
@@ -27,10 +28,15 @@ import {
 
 const navItems = [
   {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: LayoutDashboard,
+    isActive: true,
+  },
+  {
     title: "Actualités",
     url: "/feed",
     icon: Newspaper,
-    isActive: true,
   },
   {
     title: "Évènements",
@@ -43,11 +49,11 @@ const navItems = [
       },
       {
         title: "Calendrier des évènements",
-        url: "/events/calendar",
+        url: "/events-calendar",
       },
       {
         title: "Mes évènements",
-        url: "/events/my-events",
+        url: "/my-events",
       },
     ],
   },
@@ -90,7 +96,7 @@ export function UserSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="/feed">
+              <a href="/dashboard">
                 <div className="flex aspect-square size-8 items-center justify-center">
                   <Image
                     src="/logo.png"

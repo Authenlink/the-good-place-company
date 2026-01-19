@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useScroll } from "@/hooks/use-scroll";
 import { EVENT_TYPES } from "@/lib/schema";
-import { Calendar, Filter } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { EventCard } from "@/components/event-card";
 import { DynamicSidebar } from "@/components/dynamic-sidebar";
@@ -20,6 +19,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Event {
   id: number;
@@ -37,6 +37,7 @@ interface Event {
   price: string | null;
   currency: string;
   status: string;
+  companyId: number | null;
   companyName: string | null;
   companyLogo: string | null;
   participantCount: number;
@@ -50,7 +51,6 @@ export default function EventsPage() {
   const hasScrolled = useScroll();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFilter, setSelectedFilter] = useState<string>("all");
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -74,16 +74,15 @@ export default function EventsPage() {
     fetchEvents();
   }, []);
 
-  // Filtrage des événements
-  const filteredEvents =
-    selectedFilter === "all"
-      ? events
-      : events.filter((event) => event.eventType === selectedFilter);
+  // Séparer les événements en à venir et passés
+  const now = new Date();
+  const upcomingEvents = events
+    .filter((event) => new Date(event.startDate) >= now)
+    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
-  // Tri par date (plus récent en premier)
-  const sortedEvents = filteredEvents.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const pastEvents = events
+    .filter((event) => new Date(event.startDate) < now)
+    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
 
   if (loading) {
     return (
@@ -152,83 +151,75 @@ export default function EventsPage() {
             </p>
           </div>
 
-          {/* Filtres par type d'événement */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Filter className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Filtrer par type :
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedFilter === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedFilter("all")}
-                className="h-8"
-              >
-                Tous ({events.length})
-              </Button>
-              {Object.entries(EVENT_TYPES).map(([key, value]) => {
-                const count = events.filter(
-                  (event) => event.eventType === key
-                ).length;
-                return (
-                  <Button
-                    key={key}
-                    variant={selectedFilter === key ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedFilter(key)}
-                    className="h-8"
-                    disabled={count === 0}
-                  >
-                    {value} ({count})
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
+          {/* Onglets */}
+          <Tabs defaultValue="upcoming" className="w-full">
+            <TabsList>
+              <TabsTrigger value="upcoming">
+                À venir ({upcomingEvents.length})
+              </TabsTrigger>
+              <TabsTrigger value="past">
+                Passés ({pastEvents.length})
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Liste des événements */}
-          {sortedEvents.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
-                  <Calendar className="h-10 w-10 text-muted-foreground" />
+            {/* Contenu onglet "À venir" */}
+            <TabsContent value="upcoming" className="mt-6">
+              {upcomingEvents.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                      <Calendar className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                    <div className="text-center space-y-4">
+                      <h3 className="text-lg font-semibold">
+                        Aucun événement à venir
+                      </h3>
+                      <p className="text-muted-foreground max-w-md">
+                        Il n'y a pas d'événements publiés à venir pour le moment.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+                  {upcomingEvents.map((event) => (
+                    <div key={event.id} className="h-full">
+                      <EventCard event={event} />
+                    </div>
+                  ))}
                 </div>
-                <div className="text-center space-y-4">
-                  <h3 className="text-lg font-semibold">
-                    {selectedFilter === "all"
-                      ? "Aucun événement disponible"
-                      : `Aucun événement de type ${
-                          EVENT_TYPES[
-                            selectedFilter as keyof typeof EVENT_TYPES
-                          ] || selectedFilter
-                        }`}
-                  </h3>
-                  <p className="text-muted-foreground max-w-md">
-                    {selectedFilter === "all"
-                      ? "Il n'y a pas d'événements publiés pour le moment."
-                      : "Essayez de changer le filtre pour voir d'autres types d'événements."}
-                  </p>
-                  {selectedFilter !== "all" && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setSelectedFilter("all")}
-                    >
-                      Voir tous les événements
-                    </Button>
-                  )}
+              )}
+            </TabsContent>
+
+            {/* Contenu onglet "Passés" */}
+            <TabsContent value="past" className="mt-6">
+              {pastEvents.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                      <Calendar className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                    <div className="text-center space-y-4">
+                      <h3 className="text-lg font-semibold">
+                        Aucun événement passé
+                      </h3>
+                      <p className="text-muted-foreground max-w-md">
+                        Il n'y a pas d'événements passés publiés.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+                  {pastEvents.map((event) => (
+                    <div key={event.id} className="h-full">
+                      <EventCard event={event} />
+                    </div>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          )}
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </SidebarInset>
     </SidebarProvider>

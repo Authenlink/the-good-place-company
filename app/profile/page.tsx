@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { DynamicSidebar } from "@/components/dynamic-sidebar";
 import {
   Breadcrumb,
@@ -43,6 +44,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useScroll } from "@/hooks/use-scroll";
 import { UploadButton } from "@/components/ui/upload-button";
+import { BackgroundSelector } from "@/components/background-selector";
+import type { Gradient } from "@/lib/gradient-generator";
 import {
   User,
   Mail,
@@ -53,33 +56,42 @@ import {
   X,
   Trash2,
   Upload,
-  Camera,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
-// Système de dégradés automatiques pour les bannières
-const bannerGradients = [
-  "bg-gradient-to-r from-blue-500 to-purple-600",
-  "bg-gradient-to-r from-green-400 to-blue-500",
-  "bg-gradient-to-r from-pink-500 to-red-500",
-  "bg-gradient-to-r from-yellow-400 to-orange-500",
-  "bg-gradient-to-r from-indigo-500 to-purple-600",
-  "bg-gradient-to-r from-teal-400 to-blue-500",
-  "bg-gradient-to-r from-rose-500 to-pink-500",
-  "bg-gradient-to-r from-cyan-500 to-blue-600",
-  "bg-gradient-to-r from-emerald-500 to-teal-500",
-  "bg-gradient-to-r from-violet-500 to-purple-600",
-];
+// Composants d'icônes pour les réseaux sociaux
+const InstagramIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+  </svg>
+);
 
-// Fonction pour obtenir un dégradé basé sur l'ID utilisateur
-function getUserGradient(userId: string | number | undefined): string {
-  if (!userId) return bannerGradients[0]; // Dégradé par défaut si pas d'ID
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+  </svg>
+);
 
-  const idString = String(userId);
-  const hash = idString
-    .split("")
-    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return bannerGradients[hash % bannerGradients.length];
-}
+const LinkedInIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    fill="currentColor"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+  </svg>
+);
 
 export default function UserProfilePage() {
   const { data: session, status } = useSession();
@@ -101,6 +113,13 @@ export default function UserProfilePage() {
     location: "",
     website: "",
     banner: "",
+    backgroundType: null as "image" | "gradient" | null,
+    backgroundGradient: null as Gradient | null,
+    referencedCity: "",
+    isOnline: false,
+    instagramUrl: "",
+    tiktokUrl: "",
+    linkedinUrl: "",
     createdAt: new Date(),
   });
 
@@ -130,8 +149,20 @@ export default function UserProfilePage() {
         const response = await fetch("/api/user/profile");
         if (response.ok) {
           const data = await response.json();
-          setUserData(data);
-          setFormData(data);
+          const normalizedData = {
+            ...data,
+            bio: data.bio || "",
+            location: data.location || "",
+            website: data.website || "",
+            banner: data.banner || "",
+            referencedCity: data.referencedCity || "",
+            isOnline: data.isOnline || false,
+            instagramUrl: data.instagramUrl || "",
+            tiktokUrl: data.tiktokUrl || "",
+            linkedinUrl: data.linkedinUrl || "",
+          };
+          setUserData(normalizedData);
+          setFormData(normalizedData);
         } else {
           console.error("Erreur lors du chargement des données");
           // Utiliser des données par défaut si l'API échoue
@@ -144,6 +175,13 @@ export default function UserProfilePage() {
             location: "",
             website: "",
             banner: "",
+            backgroundType: null as "image" | "gradient" | null,
+            backgroundGradient: null as Gradient | null,
+            referencedCity: "",
+            isOnline: false,
+            instagramUrl: "",
+            tiktokUrl: "",
+            linkedinUrl: "",
             createdAt: new Date(),
           };
           setUserData(defaultData);
@@ -161,6 +199,13 @@ export default function UserProfilePage() {
           location: "",
           website: "",
           banner: "",
+          backgroundType: null as "image" | "gradient" | null,
+          backgroundGradient: null as Gradient | null,
+          referencedCity: "",
+          isOnline: false,
+          instagramUrl: "",
+          tiktokUrl: "",
+          linkedinUrl: "",
           createdAt: new Date(),
         };
         setUserData(defaultData);
@@ -268,9 +313,6 @@ export default function UserProfilePage() {
     }
   };
 
-  // Obtenir le dégradé pour cet utilisateur
-  const userGradient = getUserGradient(userData.id);
-
   return (
     <SidebarProvider>
       <DynamicSidebar />
@@ -318,36 +360,29 @@ export default function UserProfilePage() {
           </div>
 
           {/* User Background and Header */}
-          <Card>
-            <CardHeader className="pb-0">
-              {/* Background Image */}
-              <div
-                className={`relative h-32 rounded-lg overflow-hidden ${
-                  !formData.banner ? userGradient : ""
-                } mb-4`}
-              >
-                {formData.banner && (
-                  <img
+          <Card className="overflow-hidden p-0">
+            {/* Background Image or Gradient */}
+            <div className="relative h-32 w-full">
+                {formData.backgroundType === "gradient" && formData.backgroundGradient ? (
+                  <div
+                    className="w-full h-full"
+                    style={{
+                      background: formData.backgroundGradient.css,
+                    }}
+                  />
+                ) : formData.banner ? (
+                  <Image
                     src={formData.banner}
                     alt="Background"
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
                   />
-                )}
-                {isEditing && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <UploadButton
-                      type="banner"
-                      onUpload={(url, publicId) => {
-                        setFormData({ ...formData, banner: url });
-                      }}
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Changer la banni&egrave;re
-                    </UploadButton>
-                  </div>
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
                 )}
               </div>
 
+            <CardHeader className="pb-0">
               {/* Avatar and Basic Info */}
               <div className="flex items-start gap-4 -mt-12 relative z-10">
                 <div className="relative">
@@ -362,11 +397,18 @@ export default function UserProfilePage() {
                         .slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
+                  {/* Indicateur de présence en ligne */}
+                  <div
+                    className={`absolute bottom-0 right-0 h-5 w-5 rounded-full border-4 border-background ${
+                      formData.isOnline ? "bg-green-500" : "bg-gray-400"
+                    }`}
+                    title={formData.isOnline ? "En ligne" : "Hors ligne"}
+                  />
                   {isEditing && (
                     <div className="absolute -bottom-2 -right-2">
                       <UploadButton
                         type="avatar"
-                        onUpload={(url, publicId) => {
+                        onUpload={(url) => {
                           setFormData({ ...formData, image: url });
                         }}
                         className="h-8 w-8 rounded-full p-0"
@@ -412,26 +454,26 @@ export default function UserProfilePage() {
                   ) : (
                     <>
                       <CardTitle className="text-xl">{userData.name}</CardTitle>
-                      <div className="mt-1">
-                        <p className="text-sm text-muted-foreground whitespace-pre-line">
-                          {showFullBio ||
-                          !userData.bio ||
-                          userData.bio.length <= 150
-                            ? userData.bio ||
-                              "Décrivez-vous en quelques mots..."
-                            : `${userData.bio.substring(0, 150)}...`}
-                        </p>
-                        {userData.bio && userData.bio.length > 150 && (
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 h-auto text-xs mt-1"
-                            onClick={() => setShowFullBio(!showFullBio)}
-                          >
-                            {showFullBio ? "Voir moins" : "Voir plus"}
-                          </Button>
-                        )}
-                      </div>
+                      {userData.bio && (
+                        <div className="mt-1">
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {showFullBio ||
+                            userData.bio.length <= 150
+                              ? userData.bio
+                              : `${userData.bio.substring(0, 150)}...`}
+                          </p>
+                          {userData.bio.length > 150 && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="p-0 h-auto text-xs mt-1"
+                              onClick={() => setShowFullBio(!showFullBio)}
+                            >
+                              {showFullBio ? "Voir moins" : "Voir plus"}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-2">
                         <p className="text-xs text-muted-foreground">
                           Membre depuis{" "}
@@ -450,6 +492,73 @@ export default function UserProfilePage() {
               </div>
             </CardHeader>
           </Card>
+
+          {/* Background Selector - Only show when editing */}
+          {isEditing && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Personnalisation du background</CardTitle>
+                <CardDescription>
+                  Choisissez une image ou un gradient pour votre bannière
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <UploadButton
+                    type="banner"
+                    onUpload={(url) => {
+                      setFormData({
+                        ...formData,
+                        banner: url,
+                        backgroundType: "image",
+                      });
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Ajouter une image
+                  </UploadButton>
+                  {formData.banner && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          banner: "",
+                          backgroundType: formData.backgroundType === "image" ? null : formData.backgroundType,
+                        });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer l&apos;image
+                    </Button>
+                  )}
+                </div>
+                <BackgroundSelector
+                  images={formData.banner ? [formData.banner] : []}
+                  backgroundType={formData.backgroundType || null}
+                  backgroundImageIndex={formData.banner ? 0 : null}
+                  backgroundGradient={formData.backgroundGradient || null}
+                  onBackgroundTypeChange={(type) => {
+                    setFormData({ ...formData, backgroundType: type });
+                  }}
+                  onBackgroundImageIndexChange={() => {
+                    // For users, we only have one image (banner field)
+                    // So index doesn't really matter, but we keep it for consistency
+                    setFormData({ ...formData, backgroundType: "image" });
+                  }}
+                  onBackgroundGradientChange={(gradient) => {
+                    setFormData({
+                      ...formData,
+                      backgroundGradient: gradient,
+                      backgroundType: "gradient",
+                    });
+                  }}
+                  showPreview={true}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* User Information Grid */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -493,6 +602,22 @@ export default function UserProfilePage() {
                         placeholder="Ville, Pays"
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="referencedCity" className="mb-2">
+                        Ville de référence pour le calendrier
+                      </Label>
+                      <Input
+                        id="referencedCity"
+                        value={formData.referencedCity}
+                        onChange={(e) =>
+                          setFormData({ ...formData, referencedCity: e.target.value })
+                        }
+                        placeholder="Ville par défaut pour le calendrier d'événements"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Cette ville sera utilisée par défaut pour filtrer les événements dans le calendrier
+                      </p>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -516,6 +641,17 @@ export default function UserProfilePage() {
                         </div>
                       </div>
                     )}
+                    {userData.referencedCity && (
+                      <div className="flex items-center gap-3">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Ville de référence</p>
+                          <p className="text-sm text-muted-foreground">
+                            {userData.referencedCity}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </CardContent>
@@ -530,32 +666,135 @@ export default function UserProfilePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isEditing ? (
-                  <div>
-                    <Label htmlFor="website" className="mb-2">
-                      Site web
-                    </Label>
-                    <Input
-                      id="website"
-                      type="url"
-                      value={formData.website}
-                      onChange={(e) =>
-                        setFormData({ ...formData, website: e.target.value })
-                      }
-                      placeholder="https://votresite.com"
-                    />
-                  </div>
-                ) : (
-                  userData.website && (
-                    <div className="flex items-center gap-3">
-                      <Globe className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">Site web</p>
-                        <p className="text-sm text-muted-foreground">
-                          {userData.website}
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="isOnline">Statut en ligne</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Afficher que vous êtes en ligne
                         </p>
                       </div>
+                      <Switch
+                        id="isOnline"
+                        checked={formData.isOnline}
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, isOnline: checked })
+                        }
+                      />
                     </div>
-                  )
+                    <div>
+                      <Label htmlFor="website" className="mb-2">
+                        Site web
+                      </Label>
+                      <Input
+                        id="website"
+                        type="url"
+                        value={formData.website}
+                        onChange={(e) =>
+                          setFormData({ ...formData, website: e.target.value })
+                        }
+                        placeholder="https://votresite.com"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="instagramUrl" className="mb-2">
+                        Instagram
+                      </Label>
+                      <Input
+                        id="instagramUrl"
+                        type="url"
+                        value={formData.instagramUrl}
+                        onChange={(e) =>
+                          setFormData({ ...formData, instagramUrl: e.target.value })
+                        }
+                        placeholder="https://instagram.com/votrecompte"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="tiktokUrl" className="mb-2">
+                        TikTok
+                      </Label>
+                      <Input
+                        id="tiktokUrl"
+                        type="url"
+                        value={formData.tiktokUrl}
+                        onChange={(e) =>
+                          setFormData({ ...formData, tiktokUrl: e.target.value })
+                        }
+                        placeholder="https://tiktok.com/@votrecompte"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="linkedinUrl" className="mb-2">
+                        LinkedIn
+                      </Label>
+                      <Input
+                        id="linkedinUrl"
+                        type="url"
+                        value={formData.linkedinUrl}
+                        onChange={(e) =>
+                          setFormData({ ...formData, linkedinUrl: e.target.value })
+                        }
+                        placeholder="https://linkedin.com/in/votreprofil"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {userData.website && (
+                      <div className="flex items-center gap-3">
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Site web</p>
+                          <a
+                            href={userData.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-muted-foreground hover:text-primary"
+                          >
+                            {userData.website}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    {(userData.instagramUrl || userData.tiktokUrl || userData.linkedinUrl) && (
+                      <div className="flex items-center gap-4 pt-2">
+                        {userData.instagramUrl && (
+                          <a
+                            href={userData.instagramUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-pink-600 transition-colors"
+                            title="Instagram"
+                          >
+                            <InstagramIcon className="h-5 w-5" />
+                          </a>
+                        )}
+                        {userData.tiktokUrl && (
+                          <a
+                            href={userData.tiktokUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-black transition-colors"
+                            title="TikTok"
+                          >
+                            <TikTokIcon className="h-5 w-5" />
+                          </a>
+                        )}
+                        {userData.linkedinUrl && (
+                          <a
+                            href={userData.linkedinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-blue-600 transition-colors"
+                            title="LinkedIn"
+                          >
+                            <LinkedInIcon className="h-5 w-5" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

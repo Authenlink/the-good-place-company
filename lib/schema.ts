@@ -24,6 +24,18 @@ export const users = pgTable("users", {
   location: text("location"), // Localisation géographique
   website: text("website"), // Site web personnel
   banner: text("banner"), // Image de bannière
+  backgroundType: text("background_type").$type<"image" | "gradient" | null>(),
+  backgroundGradient: jsonb("background_gradient").$type<{
+    color1: string;
+    color2: string;
+    css: string;
+  }>(),
+  referencedCity: text("referenced_city"), // Ville de référence pour le calendrier d'événements
+  // Présence en ligne et réseaux sociaux
+  isOnline: boolean("is_online").default(false),
+  instagramUrl: text("instagram_url"),
+  tiktokUrl: text("tiktok_url"),
+  linkedinUrl: text("linkedin_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -54,6 +66,12 @@ export const companies = pgTable("companies", {
   description: text("description"),
   logo: text("logo"),
   background: text("background"), // Image de banner
+  backgroundType: text("background_type").$type<"image" | "gradient" | null>(),
+  backgroundGradient: jsonb("background_gradient").$type<{
+    color1: string;
+    color2: string;
+    css: string;
+  }>(),
   areaId: integer("area_id").references(() => areas.id),
   values: jsonb("values").$type<string[]>(), // Array des IDs des valeurs sélectionnées
   email: text("email"),
@@ -64,6 +82,11 @@ export const companies = pgTable("companies", {
   website: text("website"),
   founded: text("founded"),
   size: text("size"),
+  // Présence en ligne et réseaux sociaux
+  isOnline: boolean("is_online").default(false),
+  instagramUrl: text("instagram_url"),
+  tiktokUrl: text("tiktok_url"),
+  linkedinUrl: text("linkedin_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -183,8 +206,8 @@ export const EVENT_CATEGORIES = {
 // Types de récurrence
 export const RECURRENCE_TYPES = {
   none: "Événement unique",
+  daily: "Quotidienne",
   weekly: "Hebdomadaire",
-  biweekly: "Bimensuel",
   monthly: "Mensuel",
 } as const;
 
@@ -286,9 +309,18 @@ export const events = pgTable("events", {
   city: text("city"),
   coordinates: jsonb("coordinates").$type<{ lat: number; lng: number }>(),
   images: jsonb("images").$type<string[]>(),
+  coverImage: text("cover_image"), // Image de cover séparée
+  backgroundType: text("background_type").$type<"image" | "gradient" | null>(),
+  backgroundImageIndex: integer("background_image_index"),
+  backgroundGradient: jsonb("background_gradient").$type<{
+    color1: string;
+    color2: string;
+    css: string;
+  }>(),
   maxParticipants: integer("max_participants"),
   recurrence: text("recurrence").$type<RecurrenceType>().default("none"),
   recurrenceEndDate: timestamp("recurrence_end_date"),
+  recurrenceGroupId: integer("recurrence_group_id").references((): any => events.id, { onDelete: "cascade" }), // ID du premier événement de la série (null pour événements uniques ou premier événement)
   // Champs pour événements payants / collecte de fonds
   isPaid: boolean("is_paid").default(false),
   price: numeric("price", { precision: 10, scale: 2 }),
@@ -301,6 +333,7 @@ export const events = pgTable("events", {
   contactPhone: text("contact_phone"),
   externalLink: text("external_link"), // Lien vers billetterie externe, etc.
   status: text("status").$type<EventStatus>().notNull().default("draft"),
+  validated: boolean("validated"), // null = non validé, true = présent validé, false = absent validé
   companyId: integer("company_id")
     .notNull()
     .references(() => companies.id, { onDelete: "cascade" }),

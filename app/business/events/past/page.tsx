@@ -117,7 +117,7 @@ export default function PastEventsPage() {
     }
   };
 
-  const handleView = (event: Event) => {
+  const handleView = (event: { id: number }) => {
     router.push(`/business/events/${event.id}`);
   };
 

@@ -12,7 +12,11 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed-followers": "tsx scripts/seed-followers-data.ts",
-    "db:clean-followers": "tsx scripts/clean-followers-data.ts"
+    "db:clean-followers": "tsx scripts/clean-followers-data.ts",
+    "db:apply-background-fields": "tsx scripts/apply-background-fields-migration.ts",
+    "db:apply-recurrence-group-id": "tsx scripts/apply-recurrence-group-id-migration.ts",
+    "db:apply-online-status-social": "tsx scripts/apply-online-status-and-social-links-migration.ts",
+    "db:apply-referenced-city": "tsx scripts/apply-referenced-city-migration.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",

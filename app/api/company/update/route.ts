@@ -73,6 +73,8 @@ export async function PUT(request: NextRequest) {
       description,
       logo,
       background,
+      backgroundType,
+      backgroundGradient,
       areaId,
       values,
       email,
@@ -82,6 +84,10 @@ export async function PUT(request: NextRequest) {
       website,
       founded,
       size,
+      isOnline,
+      instagramUrl,
+      tiktokUrl,
+      linkedinUrl,
     } = body;
 
     // Validation basique
@@ -125,6 +131,9 @@ export async function PUT(request: NextRequest) {
       description: description?.trim() || null,
       logo: logo || null,
       background: background || null,
+      backgroundType: backgroundType || null,
+      backgroundGradient:
+        backgroundType === "gradient" ? backgroundGradient : null,
       areaId: areaId ? parseInt(areaId) : null,
       values: values || [],
       email: email?.trim() || null,
@@ -134,6 +143,10 @@ export async function PUT(request: NextRequest) {
       website: website?.trim() || null,
       founded: founded?.trim() || null,
       size: size || null,
+      isOnline: isOnline !== undefined ? isOnline : false,
+      instagramUrl: instagramUrl?.trim() || null,
+      tiktokUrl: tiktokUrl?.trim() || null,
+      linkedinUrl: linkedinUrl?.trim() || null,
       updatedAt: new Date(),
     };
 
