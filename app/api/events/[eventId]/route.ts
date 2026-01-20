@@ -99,6 +99,9 @@ export async function GET(
     const waitlistedCount = participants.filter(
       (p) => p.status === "waitlisted"
     ).length;
+    const pendingCount = participants.filter(
+      (p) => p.status === "pending"
+    ).length;
 
     // Vérifier si l'utilisateur actuel est inscrit
     const currentUserParticipation = participants.find(
@@ -110,6 +113,7 @@ export async function GET(
       participants,
       participantCount: confirmedCount,
       waitlistCount: waitlistedCount,
+      pendingCount: pendingCount,
       currentUserStatus: currentUserParticipation?.status || null,
     });
   } catch (error) {

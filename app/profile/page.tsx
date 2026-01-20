@@ -41,6 +41,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useScroll } from "@/hooks/use-scroll";
 import { UploadButton } from "@/components/ui/upload-button";
@@ -101,6 +102,17 @@ export default function UserProfilePage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showFullBio, setShowFullBio] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    followingUsers: 0,
+    followingCompanies: 0,
+    followingEvents: 0,
+    posts: 0,
+  });
+  const [showFollowingUsers, setShowFollowingUsers] = useState(false);
+  const [showFollowingCompanies, setShowFollowingCompanies] = useState(false);
+  const [followingUsers, setFollowingUsers] = useState<{id: number, name: string, bio?: string, image?: string}[]>([]);
+  const [followingCompanies, setFollowingCompanies] = useState<{id: number, name: string, city?: string, logo?: string}[]>([]);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
   const hasScrolled = useScroll();
 
   // Données du profil utilisateur
@@ -222,6 +234,99 @@ export default function UserProfilePage() {
       loadUserData();
     }
   }, [status, session]);
+
+  // Charger les stats de follow
+  useEffect(() => {
+    const loadStats = async () => {
+      if (
+        status === "authenticated" &&
+        session?.user?.accountType !== "business"
+      ) {
+        try {
+          const response = await fetch("/api/user/profile/stats");
+          if (response.ok) {
+            const data = await response.json();
+            setStats(data);
+          }
+        } catch (error) {
+          console.error("Erreur lors du chargement des stats:", error);
+        }
+      }
+    };
+
+    loadStats();
+  }, [status, session]);
+
+  const loadFollowingUsers = async () => {
+    setLoadingFollowing(true);
+    try {
+      const response = await fetch("/api/user/profile/following/users");
+      if (response.ok) {
+        const data = await response.json();
+        setFollowingUsers(data);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des users suivis:", error);
+    } finally {
+      setLoadingFollowing(false);
+    }
+  };
+
+  const loadFollowingCompanies = async () => {
+    setLoadingFollowing(true);
+    try {
+      const response = await fetch("/api/user/profile/following/companies");
+      if (response.ok) {
+        const data = await response.json();
+        setFollowingCompanies(data);
+      }
+    } catch (error) {
+      console.error(
+        "Erreur lors du chargement des associations suivies:",
+        error
+      );
+    } finally {
+      setLoadingFollowing(false);
+    }
+  };
+
+  const handleUnfollowUser = async (userId: number) => {
+    try {
+      const response = await fetch(`/api/user/${userId}/follow`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setFollowingUsers(followingUsers.filter((u) => u.id !== userId));
+        setStats({ ...stats, followingUsers: stats.followingUsers - 1 });
+        toast({
+          title: "Désabonnement réussi",
+          description: "Vous ne suivez plus cet utilisateur.",
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'unfollow:", error);
+    }
+  };
+
+  const handleUnfollowCompany = async (companyId: number) => {
+    try {
+      const response = await fetch(`/api/companies/follow/${companyId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setFollowingCompanies(
+          followingCompanies.filter((c) => c.id !== companyId)
+        );
+        setStats({ ...stats, followingCompanies: stats.followingCompanies - 1 });
+        toast({
+          title: "Désabonnement réussi",
+          description: "Vous ne suivez plus cette association.",
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'unfollow:", error);
+    }
+  };
 
   if (status === "loading" || isLoading) {
     return (
@@ -472,6 +577,34 @@ export default function UserProfilePage() {
                               {showFullBio ? "Voir moins" : "Voir plus"}
                             </Button>
                           )}
+                        </div>
+                      )}
+                      {stats && (
+                        <div className="flex gap-4 mt-4">
+                          <button
+                            onClick={() => {
+                              setShowFollowingUsers(true);
+                              loadFollowingUsers();
+                            }}
+                            className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                          >
+                            <span className="font-semibold">
+                              {stats.followingUsers}
+                            </span>{" "}
+                            personnes suivies
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowFollowingCompanies(true);
+                              loadFollowingCompanies();
+                            }}
+                            className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                          >
+                            <span className="font-semibold">
+                              {stats.followingCompanies}
+                            </span>{" "}
+                            associations suivies
+                          </button>
                         </div>
                       )}
                       <div className="mt-2">
@@ -811,19 +944,19 @@ export default function UserProfilePage() {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">0</div>
+                  <div className="text-2xl font-bold">{stats.followingEvents}</div>
                   <p className="text-sm text-muted-foreground">
                     Événements suivis
                   </p>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">0</div>
+                  <div className="text-2xl font-bold">{stats.posts}</div>
                   <p className="text-sm text-muted-foreground">Publications</p>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">0</div>
+                  <div className="text-2xl font-bold">{stats.followingCompanies}</div>
                   <p className="text-sm text-muted-foreground">
-                    Entreprises suivies
+                    Associations suivies
                   </p>
                 </div>
               </div>
@@ -881,6 +1014,129 @@ export default function UserProfilePage() {
           )}
         </div>
       </SidebarInset>
+
+      {/* Dialog pour les users suivis */}
+      <Dialog open={showFollowingUsers} onOpenChange={setShowFollowingUsers}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Personnes suivies</DialogTitle>
+            <DialogDescription>
+              Liste des personnes que vous suivez
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {loadingFollowing ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Chargement...
+              </div>
+            ) : followingUsers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Aucune personne suivie
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {followingUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <Link
+                      href={`/user/${user.id}`}
+                      className="flex items-center gap-3 flex-1"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={user.image || ""} />
+                        <AvatarFallback>
+                          {user.name?.charAt(0).toUpperCase() || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">
+                          {user.name || "Utilisateur"}
+                        </p>
+                        {user.bio && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {user.bio}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleUnfollowUser(user.id)}
+                    >
+                      Ne plus suivre
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog pour les associations suivies */}
+      <Dialog
+        open={showFollowingCompanies}
+        onOpenChange={setShowFollowingCompanies}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Associations suivies</DialogTitle>
+            <DialogDescription>
+              Liste des associations que vous suivez
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {loadingFollowing ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Chargement...
+              </div>
+            ) : followingCompanies.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Aucune association suivie
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {followingCompanies.map((company) => (
+                  <div
+                    key={company.id}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-accent transition-colors"
+                  >
+                    <Link
+                      href={`/company/${company.name}`}
+                      className="flex items-center gap-3 flex-1"
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={company.logo || ""} />
+                        <AvatarFallback>
+                          {company.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{company.name}</p>
+                        {company.city && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {company.city}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleUnfollowCompany(company.id)}
+                    >
+                      Ne plus suivre
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }

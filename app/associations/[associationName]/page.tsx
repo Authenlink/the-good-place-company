@@ -1,8 +1,14 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { DynamicSidebar } from "@/components/dynamic-sidebar";
+import { useToast } from "@/hooks/use-toast";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,32 +17,38 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useScroll } from "@/hooks/use-scroll";
-import { DynamicSidebar } from "@/components/dynamic-sidebar";
+import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
-  CardContent, CardHeader,
-  CardTitle
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useScroll } from "@/hooks/use-scroll";
 import {
-  Building2,
-  Mail,
-  Phone,
   MapPin,
   Globe,
   Calendar,
-  ArrowLeft,
+  Building2,
+  ExternalLink,
+  Mail,
+  Phone,
+  Target,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { EVENT_TYPES } from "@/lib/schema";
+import { cn } from "@/lib/utils";
 
 // Composants d'icônes pour les réseaux sociaux
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -76,185 +88,186 @@ interface AssociationData {
   id: number;
   name: string;
   description: string;
-  logo: string;
-  banner: string;
-  background: string;
-  backgroundType?: "image" | "gradient" | null;
-  backgroundGradient?: {
+  logo: string | null;
+  banner: string | null;
+  background: string | null;
+  backgroundType: "image" | "gradient" | null;
+  backgroundGradient: {
     color1: string;
     color2: string;
     css: string;
   } | null;
-  address: string;
-  city: string;
-  coordinates: { lat: number; lng: number };
-  email: string;
-  phone: string;
-  website: string;
-  founded: string;
-  size: string;
+  address: string | null;
+  city: string | null;
+  coordinates: { lat: number; lng: number } | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  founded: string | null;
+  size: string | null;
   category: string;
-  createdAt: string;
   values: { name: string; color: string }[];
-  isOnline?: boolean;
-  instagramUrl?: string;
-  tiktokUrl?: string;
-  linkedinUrl?: string;
+  isOnline: boolean;
+  instagramUrl: string;
+  tiktokUrl: string;
+  linkedinUrl: string;
+  createdAt: string;
+  isFollowing?: boolean;
+  events: Array<{
+    id: number;
+    title: string;
+    description: string | null;
+    eventType: string;
+    startDate: Date;
+    endDate: Date | null;
+    location: string | null;
+    city: string | null;
+    images: string[] | null;
+    coverImage: string | null;
+    status: string;
+  }>;
+  projects: Array<{
+    id: number;
+    title: string;
+    shortDescription: string | null;
+    fullDescription: string | null;
+    bannerImage: string | null;
+    tags: string[] | null;
+    customTags: string[] | null;
+    status: string;
+    createdAt: Date;
+  }>;
 }
 
-export default function AssociationPage() {
-  const params = useParams();
+export default function AssociationPage({
+  params,
+}: {
+  params: Promise<{ associationName: string }>;
+}) {
+  const resolvedParams = use(params);
   const router = useRouter();
-  const hasScrolled = useScroll();
-  const [associationData, setAssociationData] =
-    useState<AssociationData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: session } = useSession();
+  const { toast } = useToast();
+  const [association, setAssociation] = useState<AssociationData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showFullDescription, setShowFullDescription] = useState(false);
-
-  const associationName = params.associationName as string;
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isTogglingFollow, setIsTogglingFollow] = useState(false);
+  const hasScrolled = useScroll();
 
   useEffect(() => {
-    const loadAssociationData = async () => {
+    const fetchAssociation = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
-
         const response = await fetch(
-          `/api/associations/${encodeURIComponent(associationName)}`
+          `/api/associations/${encodeURIComponent(resolvedParams.associationName)}`
         );
-
-        if (response.status === 404) {
-          setError("Association non trouvée");
-          return;
+        if (response.ok) {
+          const data = await response.json();
+          setAssociation(data.association);
+          setIsFollowing(data.association.isFollowing || false);
+        } else if (response.status === 404) {
+          router.push("/associations");
         }
-
-        if (!response.ok) {
-          throw new Error("Erreur lors du chargement de l'association");
-        }
-
-        const data = await response.json();
-        setAssociationData(data.association);
       } catch (error) {
-        console.error("Erreur:", error);
-        setError(
-          "Une erreur s'est produite lors du chargement de l'association"
-        );
+        console.error("Erreur lors du chargement de l'association:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    if (associationName) {
-      loadAssociationData();
+    fetchAssociation();
+  }, [resolvedParams.associationName, router]);
+
+  const handleFollowToggle = async () => {
+    if (!session?.user || session.user.accountType !== "user") {
+      toast({
+        title: "Connexion requise",
+        description: "Vous devez être connecté pour suivre une association.",
+        variant: "destructive",
+      });
+      return;
     }
-  }, [associationName]);
 
-  if (isLoading) {
+    if (!association) return;
+
+    setIsTogglingFollow(true);
+    try {
+      const method = isFollowing ? "DELETE" : "POST";
+      const response = await fetch(
+        `/api/companies/follow/${association.id}`,
+        {
+          method,
+        }
+      );
+
+      if (response.ok) {
+        setIsFollowing(!isFollowing);
+        toast({
+          title: isFollowing ? "Désabonnement réussi" : "Abonnement réussi",
+          description: isFollowing
+            ? "Vous ne suivez plus cette association."
+            : "Vous suivez maintenant cette association.",
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Erreur",
+          description: error.error || "Une erreur s'est produite.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors du toggle follow:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur s'est produite lors de l'opération.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTogglingFollow(false);
+    }
+  };
+
+  if (loading) {
     return (
       <SidebarProvider>
         <DynamicSidebar />
         <SidebarInset>
-          <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <header className="flex h-16 shrink-0 items-center gap-2">
             <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 data-[orientation=vertical]:h-4"
-              />
-              <div className="text-sm text-muted-foreground">Chargement...</div>
+              <Skeleton className="h-6 w-6" />
+              <Skeleton className="h-4 w-32" />
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="mb-6">
-              <Skeleton className="h-6 w-64 mb-2" />
-              <Skeleton className="h-4 w-96" />
-            </div>
-
-            <Card className="overflow-hidden p-0">
-              <Skeleton className="h-32 w-full" />
-              <CardHeader className="pb-0">
-                <div className="flex items-start gap-4 -mt-12 relative z-10">
-                  <Skeleton className="h-20 w-20 rounded-full" />
-                  <div className="flex-1 pt-8">
-                    <Skeleton className="h-6 w-64 mb-2" />
-                    <Skeleton className="h-4 w-full mb-1" />
-                    <Skeleton className="h-4 w-3/4" />
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {[...Array(2)].map((_, i) => (
-                <Skeleton key={i} className="h-48 rounded-xl" />
-              ))}
-            </div>
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
+            <Skeleton className="h-64 rounded-xl" />
+            <Skeleton className="h-32 rounded-xl" />
           </div>
         </SidebarInset>
       </SidebarProvider>
     );
   }
 
-  if (error) {
-    return (
-      <SidebarProvider>
-        <DynamicSidebar />
-        <SidebarInset>
-          <header
-            className={`sticky top-0 z-10 flex h-16 shrink-0 items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
-              hasScrolled ? "border-b" : ""
-            }`}
-          >
-            <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator
-                orientation="vertical"
-                className="mr-2 data-[orientation=vertical]:h-4"
-              />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href="/associations">
-                      Associations
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>Association</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-          </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="text-center py-12">
-              <h1 className="text-2xl font-bold text-destructive mb-4">
-                {error}
-              </h1>
-              <Button onClick={() => router.push("/associations")}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Retour aux associations
-              </Button>
-            </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    );
-  }
-
-  if (!associationData) {
+  if (!association) {
     return null;
   }
+
+  const bannerStyle =
+    association.backgroundType === "gradient" && association.backgroundGradient
+      ? { background: association.backgroundGradient.css }
+      : association.banner || association.background
+      ? {}
+      : { background: "linear-gradient(to bottom, #f3f4f6, #ffffff)" };
 
   return (
     <SidebarProvider>
       <DynamicSidebar />
       <SidebarInset>
         <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
+          className={cn(
+            "sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
             hasScrolled ? "border-b" : ""
-          }`}
+          )}
         >
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
@@ -269,265 +282,415 @@ export default function AssociationPage() {
                     Associations
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator>&gt;</BreadcrumbSeparator>
+                <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>{associationData.name}</BreadcrumbPage>
+                  <BreadcrumbPage>{association.name}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="mb-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-2xl font-bold">{associationData.name}</h1>
-                <p className="text-muted-foreground">
-                  Découvrez cette association et ses activités solidaires
-                </p>
-              </div>
-              <Button variant="outline" onClick={() => router.back()}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Retour
-              </Button>
-            </div>
-          </div>
-
-          {/* Association Background and Header */}
-          <Card className="overflow-hidden p-0">
-            {/* Background Image or Gradient */}
-            <div className="relative h-32 w-full">
-              {associationData.backgroundType === "gradient" && associationData.backgroundGradient ? (
-                <div
-                  className="w-full h-full"
-                  style={{
-                    background: associationData.backgroundGradient.css,
-                  }}
-                />
-              ) : associationData.background || associationData.banner ? (
+        <div className="flex flex-1 flex-col">
+          {/* Banner */}
+          <div className="relative h-48 w-full" style={bannerStyle}>
+            {association.backgroundType === "image" &&
+              (association.banner || association.background) && (
                 <Image
-                  src={associationData.background || associationData.banner}
-                  alt="Background"
+                  src={association.banner || association.background || ""}
+                  alt="Banner"
                   fill
                   className="object-cover"
                 />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
               )}
-            </div>
+          </div>
 
-            <CardHeader className="pb-0">
-              {/* Logo and Basic Info */}
-              <div className="flex items-start gap-4 -mt-12 relative z-10">
-                <div className="relative">
-                  <Avatar className="h-20 w-20 border-4 border-background">
-                    <AvatarImage
-                      src={associationData.logo}
-                      alt={associationData.name}
-                    />
-                    <AvatarFallback className="text-lg">
-                      {associationData.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  {/* Indicateur de présence en ligne */}
-                  {associationData.isOnline !== undefined && (
-                    <div
-                      className={`absolute bottom-0 right-0 h-5 w-5 rounded-full border-4 border-background ${
-                        associationData.isOnline ? "bg-green-500" : "bg-gray-400"
-                      }`}
-                      title={associationData.isOnline ? "En ligne" : "Hors ligne"}
-                    />
+          <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
+            {/* Association Header */}
+            <div className="flex flex-col md:flex-row gap-4 -mt-16">
+              <Avatar className="h-32 w-32 border-4 border-background">
+                <AvatarImage src={association.logo || ""} />
+                <AvatarFallback>
+                  {association.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 pt-20 md:pt-24">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold">{association.name}</h1>
+                    {association.isOnline && (
+                      <Badge
+                        variant="outline"
+                        className="mt-2 bg-green-500/10 text-green-600 border-green-500/20"
+                      >
+                        En ligne
+                      </Badge>
+                    )}
+                  </div>
+                  {session?.user && session.user.accountType === "user" && (
+                    <Button
+                      onClick={handleFollowToggle}
+                      disabled={isTogglingFollow}
+                      variant={isFollowing ? "outline" : "default"}
+                    >
+                      {isTogglingFollow
+                        ? "Chargement..."
+                        : isFollowing
+                        ? "Ne plus suivre"
+                        : "Suivre"}
+                    </Button>
                   )}
                 </div>
-                <div className="flex-1 pt-8">
-                  <CardTitle className="text-xl mb-2">{associationData.name}</CardTitle>
-                  <div className="mb-3">
-                    <p className="text-sm text-muted-foreground whitespace-pre-line">
-                      {showFullDescription ||
-                      associationData.description.length <= 150
-                        ? associationData.description
-                        : `${associationData.description.substring(0, 150)}...`}
+                {association.description && (
+                  <div className="mt-4">
+                    <p
+                      className={cn(
+                        "text-muted-foreground whitespace-pre-wrap",
+                        !showFullDescription && "line-clamp-5"
+                      )}
+                    >
+                      {association.description}
                     </p>
-                    {associationData.description.length > 150 && (
+                    {association.description.split("\n").length > 5 && (
                       <Button
                         variant="link"
                         size="sm"
-                        className="p-0 h-auto text-xs mt-1"
-                        onClick={() =>
-                          setShowFullDescription(!showFullDescription)
-                        }
+                        className="mt-2 h-auto p-0 text-xs"
+                        onClick={() => setShowFullDescription(!showFullDescription)}
                       >
-                        {showFullDescription ? "Voir moins" : "Voir plus"}
+                        {showFullDescription ? (
+                          <>
+                            <ChevronUp className="h-3 w-3 mr-1" />
+                            Voir moins
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3 w-3 mr-1" />
+                            Voir plus
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>
-                  <div className="mt-2">
-                    <p className="text-xs text-muted-foreground">
-                      Association créée en{" "}
-                      {new Date(associationData.createdAt).toLocaleDateString("fr-FR", {
-                        year: "numeric",
-                        month: "long",
-                      })}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {associationData.category && (
-                      <Badge variant="secondary">{associationData.category}</Badge>
-                    )}
-                    {associationData.size && (
-                      <Badge variant="outline">{associationData.size}</Badge>
-                    )}
-                    {associationData.values?.map((value, index) => (
+                )}
+                <div className="flex flex-wrap gap-4 mt-4">
+                  {association.city && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      {association.city}
+                    </div>
+                  )}
+                  {association.website && (
+                    <a
+                      href={association.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Globe className="h-4 w-4" />
+                      Site web
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {(association.instagramUrl ||
+                    association.tiktokUrl ||
+                    association.linkedinUrl) && (
+                    <div className="flex items-center gap-3">
+                      {association.instagramUrl && (
+                        <a
+                          href={association.instagramUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <InstagramIcon className="h-5 w-5" />
+                        </a>
+                      )}
+                      {association.tiktokUrl && (
+                        <a
+                          href={association.tiktokUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <TikTokIcon className="h-5 w-5" />
+                        </a>
+                      )}
+                      {association.linkedinUrl && (
+                        <a
+                          href={association.linkedinUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <LinkedInIcon className="h-5 w-5" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {association.values.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {association.values.map((value, index) => (
                       <Badge
                         key={index}
                         variant="outline"
-                        className={`${value.color} text-white border-transparent`}
+                        className={cn(
+                          "text-white border-transparent",
+                          value.color
+                        )}
                       >
                         {value.name}
                       </Badge>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
-            </CardHeader>
-          </Card>
+            </div>
 
-          {/* Association Information Grid */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Informations générales
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">
-                      {associationData.email || "Non spécifié"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Téléphone</p>
-                    <p className="text-sm text-muted-foreground">
-                      {associationData.phone || "Non spécifié"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Adresse</p>
-                    <p className="text-sm text-muted-foreground">
-                      {associationData.address && associationData.city
-                        ? `${associationData.address}, ${associationData.city}`
-                        : associationData.address ||
-                          associationData.city ||
-                          "Non spécifiée"}
-                    </p>
-                  </div>
-                </div>
-                {associationData.category && (
-                  <div className="flex items-center gap-3">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Secteur</p>
-                      <p className="text-sm text-muted-foreground">
-                        {associationData.category}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <Separator />
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Globe className="h-5 w-5" />
-                  Présence en ligne
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {associationData.website && (
-                  <div className="flex items-center gap-3">
-                    <Globe className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Site web</p>
-                      <a
-                        href={associationData.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-muted-foreground hover:text-primary"
-                      >
-                        {associationData.website}
-                      </a>
-                    </div>
-                  </div>
-                )}
-                {associationData.founded && (
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Fondée en</p>
-                      <p className="text-sm text-muted-foreground">
-                        {associationData.founded}
+            {/* Contenu principal */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Colonne principale */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Événements */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5" />
+                      Événements ({association.events.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Événements organisés par cette association
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {association.events.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        Aucun événement pour le moment
                       </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {association.events.map((event) => {
+                          const startDate = new Date(event.startDate);
+                          return (
+                            <Link
+                              key={event.id}
+                              href={`/events/${event.id}`}
+                              className="block"
+                            >
+                              <Card className="hover:bg-accent transition-colors cursor-pointer">
+                                <CardContent className="p-4">
+                                  <div className="flex gap-4">
+                                    {event.coverImage && (
+                                      <div className="relative h-20 w-20 flex-shrink-0 rounded-lg overflow-hidden">
+                                        <Image
+                                          src={event.coverImage}
+                                          alt={event.title}
+                                          fill
+                                          className="object-cover"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <h3 className="font-semibold truncate">
+                                          {event.title}
+                                        </h3>
+                                        <Badge
+                                          variant="outline"
+                                          className="flex-shrink-0"
+                                        >
+                                          {EVENT_TYPES[event.eventType as keyof typeof EVENT_TYPES] || event.eventType}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                                        <div className="flex items-center gap-1">
+                                          <Calendar className="h-4 w-4" />
+                                          {format(startDate, "d MMM yyyy", {
+                                            locale: fr,
+                                          })}
+                                        </div>
+                                        {event.city && (
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-4 w-4" />
+                                            {event.city}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Projets */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Projets ({association.projects.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Projets portés par cette association
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {association.projects.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">
+                        Aucun projet pour le moment
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {association.projects.map((project) => (
+                          <Link
+                            key={project.id}
+                            href={`/projects/${project.id}`}
+                            className="block"
+                          >
+                            <Card className="hover:bg-accent transition-colors cursor-pointer">
+                              <CardContent className="p-4">
+                                <div className="flex gap-4">
+                                  {project.bannerImage && (
+                                    <div className="relative h-20 w-20 flex-shrink-0 rounded-lg overflow-hidden">
+                                      <Image
+                                        src={project.bannerImage}
+                                        alt={project.title}
+                                        fill
+                                        className="object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold truncate">
+                                      {project.title}
+                                    </h3>
+                                    {(project.shortDescription ||
+                                      project.fullDescription) && (
+                                      <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                                        {project.shortDescription ||
+                                          project.fullDescription}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Colonne latérale */}
+              <div className="space-y-6">
+                {/* Informations */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Informations</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {association.category && (
+                      <div className="flex items-center gap-3">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Secteur</p>
+                          <p className="text-sm text-muted-foreground">
+                            {association.category}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {association.email && (
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Email</p>
+                          <a
+                            href={`mailto:${association.email}`}
+                            className="text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            {association.email}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    {association.phone && (
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Téléphone</p>
+                          <a
+                            href={`tel:${association.phone}`}
+                            className="text-sm text-muted-foreground hover:text-foreground"
+                          >
+                            {association.phone}
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    {association.address && (
+                      <div className="flex items-start gap-3">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium">Adresse</p>
+                          <p className="text-sm text-muted-foreground">
+                            {association.address}
+                            {association.city && `, ${association.city}`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {association.founded && (
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Fondée en</p>
+                          <p className="text-sm text-muted-foreground">
+                            {association.founded}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {association.size && (
+                      <div className="flex items-center gap-3">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Taille</p>
+                          <p className="text-sm text-muted-foreground">
+                            {association.size}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t">
+                      <span className="text-sm text-muted-foreground">
+                        Membre depuis
+                      </span>
+                      <span className="text-sm">
+                        {format(new Date(association.createdAt), "MMM yyyy", {
+                          locale: fr,
+                        })}
+                      </span>
                     </div>
-                  </div>
-                )}
-                {(associationData.instagramUrl || associationData.tiktokUrl || associationData.linkedinUrl) && (
-                  <div className="flex items-center gap-4 pt-2">
-                    {associationData.instagramUrl && (
-                      <a
-                        href={associationData.instagramUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-pink-600 transition-colors"
-                        title="Instagram"
-                      >
-                        <InstagramIcon className="h-5 w-5" />
-                      </a>
-                    )}
-                    {associationData.tiktokUrl && (
-                      <a
-                        href={associationData.tiktokUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-black transition-colors"
-                        title="TikTok"
-                      >
-                        <TikTokIcon className="h-5 w-5" />
-                      </a>
-                    )}
-                    {associationData.linkedinUrl && (
-                      <a
-                        href={associationData.linkedinUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-blue-600 transition-colors"
-                        title="LinkedIn"
-                      >
-                        <LinkedInIcon className="h-5 w-5" />
-                      </a>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
-
         </div>
       </SidebarInset>
     </SidebarProvider>

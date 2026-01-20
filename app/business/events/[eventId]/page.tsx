@@ -15,7 +15,10 @@ import {
   Trash2,
   RefreshCw,
   ArrowLeft,
-  UserMinus,
+  Check,
+  X,
+  ExternalLink,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +55,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useScroll } from "@/hooks/use-scroll";
 import {
@@ -101,12 +120,14 @@ const statusLabels: Record<EventStatus, string> = {
 };
 
 const participantStatusColors: Record<ParticipantStatus, string> = {
+  pending: "bg-yellow-500/10 text-yellow-600",
   confirmed: "bg-green-500/10 text-green-600",
   waitlisted: "bg-orange-500/10 text-orange-600",
   cancelled: "bg-red-500/10 text-red-600",
 };
 
 const participantStatusLabels: Record<ParticipantStatus, string> = {
+  pending: "En attente de validation",
   confirmed: "Inscrit",
   waitlisted: "En attente",
   cancelled: "Annulé",
@@ -134,6 +155,14 @@ interface EventDetail {
   city: string | null;
   coordinates: { lat: number; lng: number } | null;
   images: string[] | null;
+  coverImage: string | null;
+  backgroundType: "image" | "gradient" | null;
+  backgroundImageIndex: number | null;
+  backgroundGradient: {
+    color1: string;
+    color2: string;
+    css: string;
+  } | null;
   maxParticipants: number | null;
   recurrence: string | null;
   recurrenceEndDate: string | null;
@@ -143,6 +172,7 @@ interface EventDetail {
   companyLogo: string | null;
   participantCount: number;
   waitlistCount: number;
+  pendingCount?: number;
   participants: Participant[];
   currentUserStatus: ParticipantStatus | null;
   createdAt: string;
@@ -161,6 +191,11 @@ export default function EventDetailPage({
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [participantToRemove, setParticipantToRemove] = useState<{
+    userId: number;
+    userName: string | null;
+  } | null>(null);
   const hasScrolled = useScroll();
 
   useEffect(() => {
@@ -204,14 +239,17 @@ export default function EventDetailPage({
     }
   };
 
-  const handleRemoveParticipant = async (userId: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir retirer ce participant ?")) {
-      return;
-    }
+  const handleRemoveParticipantClick = (userId: number, userName: string | null) => {
+    setParticipantToRemove({ userId, userName });
+    setRemoveDialogOpen(true);
+  };
+
+  const handleRemoveParticipant = async () => {
+    if (!participantToRemove) return;
 
     try {
       const response = await fetch(
-        `/api/events/${resolvedParams.eventId}/participants?userId=${userId}`,
+        `/api/events/${resolvedParams.eventId}/participants?userId=${participantToRemove.userId}`,
         { method: "DELETE" }
       );
 
@@ -221,6 +259,8 @@ export default function EventDetailPage({
           description: "Le participant a été retiré de l'événement.",
         });
         fetchEvent(true);
+        setRemoveDialogOpen(false);
+        setParticipantToRemove(null);
       } else {
         throw new Error("Erreur lors du retrait");
       }
@@ -229,6 +269,49 @@ export default function EventDetailPage({
       toast({
         title: "Erreur",
         description: "Impossible de retirer le participant.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendMessage = () => {
+    // TODO: Implémenter la messagerie plus tard
+    toast({
+      title: "Fonctionnalité à venir",
+      description: "La messagerie sera disponible prochainement.",
+    });
+  };
+
+  const handleUpdateParticipantStatus = async (
+    participantId: number,
+    newStatus: ParticipantStatus
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/events/${resolvedParams.eventId}/participants/${participantId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Statut mis à jour",
+          description: data.message || "Le statut a été modifié avec succès.",
+        });
+        fetchEvent(true);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erreur lors de la mise à jour");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast({
+        title: "Erreur",
+        description: (error as Error)?.message || "Impossible de mettre à jour le statut.",
         variant: "destructive",
       });
     }
@@ -327,6 +410,43 @@ export default function EventDetailPage({
   const waitlistedParticipants = event.participants.filter(
     (p) => p.status === "waitlisted"
   );
+  const pendingParticipants = event.participants.filter(
+    (p) => p.status === "pending"
+  );
+
+  // Déterminer le background à afficher
+  const getBackground = () => {
+    if (event.backgroundType === "gradient" && event.backgroundGradient) {
+      return {
+        type: "gradient" as const,
+        value: event.backgroundGradient.css,
+      };
+    }
+    if (event.backgroundType === "image" && event.images && event.images.length > 0) {
+      const imageIndex = event.backgroundImageIndex ?? 0;
+      if (imageIndex >= 0 && imageIndex < event.images.length) {
+        return {
+          type: "image" as const,
+          value: event.images[imageIndex],
+        };
+      }
+    }
+    if (event.coverImage) {
+      return {
+        type: "image" as const,
+        value: event.coverImage,
+      };
+    }
+    if (event.images && event.images.length > 0) {
+      return {
+        type: "image" as const,
+        value: event.images[0],
+      };
+    }
+    return null;
+  };
+
+  const background = getBackground();
 
   return (
     <SidebarProvider>
@@ -404,18 +524,23 @@ export default function EventDetailPage({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Colonne principale */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Image et infos principales */}
-              <Card>
-                {event.images && event.images.length > 0 && (
+              {/* Image/Gradient et infos principales */}
+              <Card className="overflow-hidden pt-0">
+                {event.images && event.images.length > 0 ? (
                   <div className="relative h-64 w-full">
                     <Image
                       src={event.images[0]}
                       alt={event.title}
                       fill
-                      className="object-cover rounded-t-lg"
+                      className="object-cover"
                     />
                   </div>
-                )}
+                ) : background?.type === "gradient" ? (
+                  <div
+                    className="relative h-64 w-full"
+                    style={{ background: background.value }}
+                  />
+                ) : null}
                 <CardHeader>
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2">
@@ -533,11 +658,18 @@ export default function EventDetailPage({
                     {event.participantCount > 1 ? "s" : ""}
                     {event.waitlistCount > 0 &&
                       ` • ${event.waitlistCount} en liste d'attente`}
+                    {pendingParticipants.length > 0 &&
+                      ` • ${pendingParticipants.length} en attente de validation`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="confirmed">
+                  <Tabs defaultValue={pendingParticipants.length > 0 ? "pending" : "confirmed"}>
                     <TabsList className="mb-4">
+                      {pendingParticipants.length > 0 && (
+                        <TabsTrigger value="pending">
+                          En attente ({pendingParticipants.length})
+                        </TabsTrigger>
+                      )}
                       <TabsTrigger value="confirmed">
                         Inscrits ({confirmedParticipants.length})
                       </TabsTrigger>
@@ -545,6 +677,114 @@ export default function EventDetailPage({
                         Liste d&apos;attente ({waitlistedParticipants.length})
                       </TabsTrigger>
                     </TabsList>
+
+                    <TabsContent value="pending">
+                      {pendingParticipants.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8">
+                          Aucune candidature en attente de validation
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Participant</TableHead>
+                              <TableHead>Email</TableHead>
+                              <TableHead>Inscrit le</TableHead>
+                              <TableHead className="w-[200px]">
+                                Actions
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {pendingParticipants.map((participant) => (
+                              <TableRow key={participant.id}>
+                                <TableCell>
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarImage
+                                        src={participant.userImage || ""}
+                                      />
+                                      <AvatarFallback>
+                                        {participant.userName
+                                          ?.charAt(0)
+                                          .toUpperCase() || "U"}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">
+                                        {participant.userName || "Utilisateur"}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "w-fit mt-1",
+                                          participantStatusColors[participant.status]
+                                        )}
+                                      >
+                                        {participantStatusLabels[participant.status]}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {participant.userEmail}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {format(
+                                    new Date(participant.createdAt),
+                                    "d MMM yyyy",
+                                    { locale: fr }
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        window.open(
+                                          `/user/${participant.userId}`,
+                                          "_blank"
+                                        )
+                                      }
+                                      title="Voir le profil"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleUpdateParticipantStatus(
+                                          participant.id,
+                                          "confirmed"
+                                        )
+                                      }
+                                      title="Valider"
+                                    >
+                                      <Check className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleUpdateParticipantStatus(
+                                          participant.id,
+                                          "cancelled"
+                                        )
+                                      }
+                                      title="Refuser"
+                                    >
+                                      <X className="h-4 w-4 text-red-600" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </TabsContent>
 
                     <TabsContent value="confirmed">
                       {confirmedParticipants.length === 0 ? (
@@ -558,7 +798,7 @@ export default function EventDetailPage({
                               <TableHead>Participant</TableHead>
                               <TableHead>Email</TableHead>
                               <TableHead>Inscrit le</TableHead>
-                              <TableHead className="w-[100px]">
+                              <TableHead className="w-[200px]">
                                 Actions
                               </TableHead>
                             </TableRow>
@@ -578,9 +818,20 @@ export default function EventDetailPage({
                                           .toUpperCase() || "U"}
                                       </AvatarFallback>
                                     </Avatar>
-                                    <span className="font-medium">
-                                      {participant.userName || "Utilisateur"}
-                                    </span>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">
+                                        {participant.userName || "Utilisateur"}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "w-fit mt-1",
+                                          participantStatusColors[participant.status]
+                                        )}
+                                      >
+                                        {participantStatusLabels[participant.status]}
+                                      </Badge>
+                                    </div>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">
@@ -594,17 +845,56 @@ export default function EventDetailPage({
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleRemoveParticipant(
-                                        participant.userId
-                                      )
-                                    }
-                                  >
-                                    <UserMinus className="h-4 w-4" />
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        window.open(
+                                          `/user/${participant.userId}`,
+                                          "_blank"
+                                        )
+                                      }
+                                      title="Voir le profil"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 text-xs"
+                                        >
+                                          Gérer
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-56">
+                                        <DropdownMenuLabel>
+                                          {participant.userName || "Utilisateur"}
+                                        </DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={handleSendMessage}
+                                        >
+                                          <MessageSquare className="h-4 w-4 mr-2" />
+                                          Envoyer un message
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          variant="destructive"
+                                          onClick={() =>
+                                            handleRemoveParticipantClick(
+                                              participant.userId,
+                                              participant.userName
+                                            )
+                                          }
+                                        >
+                                          <X className="h-4 w-4 mr-2" />
+                                          Retirer de la liste
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -626,7 +916,7 @@ export default function EventDetailPage({
                               <TableHead>Participant</TableHead>
                               <TableHead>Email</TableHead>
                               <TableHead>Inscrit le</TableHead>
-                              <TableHead className="w-[100px]">
+                              <TableHead className="w-[200px]">
                                 Actions
                               </TableHead>
                             </TableRow>
@@ -648,9 +938,20 @@ export default function EventDetailPage({
                                             .toUpperCase() || "U"}
                                         </AvatarFallback>
                                       </Avatar>
-                                      <span className="font-medium">
-                                        {participant.userName || "Utilisateur"}
-                                      </span>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">
+                                          {participant.userName || "Utilisateur"}
+                                        </span>
+                                        <Badge
+                                          variant="outline"
+                                          className={cn(
+                                            "w-fit mt-1",
+                                            participantStatusColors[participant.status]
+                                          )}
+                                        >
+                                          {participantStatusLabels[participant.status]}
+                                        </Badge>
+                                      </div>
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-muted-foreground">
@@ -664,17 +965,69 @@ export default function EventDetailPage({
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        handleRemoveParticipant(
-                                          participant.userId
-                                        )
-                                      }
-                                    >
-                                      <UserMinus className="h-4 w-4" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          window.open(
+                                            `/user/${participant.userId}`,
+                                            "_blank"
+                                          )
+                                        }
+                                        title="Voir le profil"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleUpdateParticipantStatus(
+                                            participant.id,
+                                            "confirmed"
+                                          )
+                                        }
+                                        title="Valider"
+                                      >
+                                        <Check className="h-4 w-4 text-green-600" />
+                                      </Button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 px-2 text-xs"
+                                          >
+                                            Gérer
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-56">
+                                          <DropdownMenuLabel>
+                                            {participant.userName || "Utilisateur"}
+                                          </DropdownMenuLabel>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem
+                                            onClick={handleSendMessage}
+                                          >
+                                            <MessageSquare className="h-4 w-4 mr-2" />
+                                            Envoyer un message
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            variant="destructive"
+                                            onClick={() =>
+                                              handleRemoveParticipantClick(
+                                                participant.userId,
+                                                participant.userName
+                                              )
+                                            }
+                                          >
+                                            <X className="h-4 w-4 mr-2" />
+                                            Retirer de la liste
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               )
@@ -820,6 +1173,36 @@ export default function EventDetailPage({
           </div>
         </div>
       </SidebarInset>
+
+      {/* Dialog de confirmation pour retirer un participant */}
+      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Retirer le participant</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir retirer{" "}
+              <strong>
+                {participantToRemove?.userName || "ce participant"}
+              </strong>{" "}
+              de la liste ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRemoveDialogOpen(false);
+                setParticipantToRemove(null);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveParticipant}>
+              Retirer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }

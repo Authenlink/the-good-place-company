@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { comments, users, companies } from "@/lib/schema";
+import { comments, users, companies, commentLikes, posts } from "@/lib/schema";
 import { eq, desc, and, isNull } from "drizzle-orm";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
+import { createNotification } from "@/lib/notifications";
 
 export async function GET(
   request: NextRequest,
@@ -23,6 +24,44 @@ export async function GET(
       );
     }
 
+    const userId = parseInt(session.user.id);
+    let companyId = null;
+
+    if (session.user.accountType === "business") {
+      const companyResult = await db
+        .select({ id: companies.id })
+        .from(companies)
+        .where(eq(companies.userId, userId))
+        .limit(1);
+
+      if (companyResult.length > 0) {
+        companyId = companyResult[0].id;
+      }
+    }
+
+    // Fonction helper pour récupérer les likes d'un commentaire
+    const getCommentLikes = async (commentId: number) => {
+      const likes = await db
+        .select()
+        .from(commentLikes)
+        .where(eq(commentLikes.commentId, commentId));
+
+      const count = likes.length;
+
+      let isLiked = false;
+      if (session.user.accountType === "user" && userId) {
+        isLiked = likes.some(
+          (like) => like.userId === userId && like.companyId === null
+        );
+      } else if (session.user.accountType === "business" && companyId) {
+        isLiked = likes.some(
+          (like) => like.companyId === companyId && like.userId === null
+        );
+      }
+
+      return { count, isLiked };
+    };
+
     // Récupérer tous les commentaires du post (commentaires principaux uniquement)
     const postComments = await db
       .select({
@@ -35,8 +74,10 @@ export async function GET(
         parentId: comments.parentId,
         userName: users.name,
         userImage: users.image,
+        userGradient: users.backgroundGradient,
         companyName: companies.name,
         companyLogo: companies.logo,
+        companyGradient: companies.backgroundGradient,
       })
       .from(comments)
       .leftJoin(users, eq(comments.userId, users.id))
@@ -44,7 +85,7 @@ export async function GET(
       .where(and(eq(comments.postId, postId), isNull(comments.parentId)))
       .orderBy(desc(comments.createdAt));
 
-    // Pour chaque commentaire, récupérer les réponses
+    // Pour chaque commentaire, récupérer les réponses et les likes
     const commentsWithReplies = await Promise.all(
       postComments.map(async (comment) => {
         const replies = await db
@@ -58,8 +99,10 @@ export async function GET(
             parentId: comments.parentId,
             userName: users.name,
             userImage: users.image,
+            userGradient: users.backgroundGradient,
             companyName: companies.name,
             companyLogo: companies.logo,
+            companyGradient: companies.backgroundGradient,
           })
           .from(comments)
           .leftJoin(users, eq(comments.userId, users.id))
@@ -67,9 +110,22 @@ export async function GET(
           .where(eq(comments.parentId, comment.id))
           .orderBy(comments.createdAt);
 
+        // Récupérer les likes pour le commentaire principal et les réponses
+        const commentLikesData = await getCommentLikes(comment.id);
+        const repliesWithLikes = await Promise.all(
+          replies.map(async (reply) => {
+            const replyLikesData = await getCommentLikes(reply.id);
+            return {
+              ...reply,
+              likes: replyLikesData,
+            };
+          })
+        );
+
         return {
           ...comment,
-          replies,
+          replies: repliesWithLikes,
+          likes: commentLikesData,
         };
       })
     );
@@ -129,6 +185,17 @@ export async function POST(
       }
     }
 
+    // Récupérer le post pour notifier son créateur
+    const post = await db
+      .select({
+        id: posts.id,
+        userId: posts.userId,
+        companyId: posts.companyId,
+      })
+      .from(posts)
+      .where(eq(posts.id, postId))
+      .limit(1);
+
     // Créer le commentaire
     const newComment = (await db
       .insert(comments)
@@ -146,6 +213,38 @@ export async function POST(
         { error: "Erreur lors de la création du commentaire" },
         { status: 500 }
       );
+    }
+
+    // Créer une notification pour le créateur du post (si ce n'est pas le même utilisateur)
+    if (post.length > 0) {
+      const postData = post[0];
+      if (postData.userId && postData.userId !== userId) {
+        await createNotification({
+          userId: postData.userId,
+          type: "post_commented",
+          relatedUserId: session.user.accountType === "user" ? userId : undefined,
+          relatedCompanyId: companyId || undefined,
+          relatedPostId: postId,
+          relatedCommentId: newComment[0].id,
+        });
+      } else if (postData.companyId) {
+        const companyData = await db
+          .select({ userId: companies.userId })
+          .from(companies)
+          .where(eq(companies.id, postData.companyId))
+          .limit(1);
+
+        if (companyData.length > 0 && companyData[0].userId !== userId) {
+          await createNotification({
+            userId: companyData[0].userId,
+            type: "post_commented",
+            relatedUserId: session.user.accountType === "user" ? userId : undefined,
+            relatedCompanyId: companyId || undefined,
+            relatedPostId: postId,
+            relatedCommentId: newComment[0].id,
+          });
+        }
+      }
     }
 
     return NextResponse.json(newComment[0], { status: 201 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,6 +27,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EVENT_TYPES } from "@/lib/schema";
+import { EventCommentSection } from "@/components/event-comment-section";
+import { useToast } from "@/hooks/use-toast";
 
 interface EventCardProps {
   event: {
@@ -78,11 +80,102 @@ export function EventCard({
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [loadingLikes, setLoadingLikes] = useState(true);
+  const { toast } = useToast();
 
-  const handleLike = () => {
+  // Charger l'état initial des likes et le nombre de commentaires
+  useEffect(() => {
+    fetchLikes();
+    fetchCommentCount();
+  }, [event.id]);
+
+  const fetchLikes = async () => {
+    try {
+      const response = await fetch(`/api/events/${event.id}/likes`);
+      if (response.ok) {
+        const data = await response.json();
+        setLikeCount(data.count);
+        setIsLiked(data.isLiked);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des likes:", error);
+    } finally {
+      setLoadingLikes(false);
+    }
+  };
+
+  const handleLike = async () => {
+    const previousIsLiked = isLiked;
+    const previousCount = likeCount;
+
+    // Optimistic update
     setIsLiked(!isLiked);
     setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
+
+    try {
+      if (previousIsLiked) {
+        // Supprimer le like
+        const response = await fetch(`/api/events/${event.id}/likes`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          // Revert on error
+          setIsLiked(previousIsLiked);
+          setLikeCount(previousCount);
+        }
+      } else {
+        // Ajouter le like
+        const response = await fetch(`/api/events/${event.id}/likes`, {
+          method: "POST",
+        });
+        if (!response.ok) {
+          // Revert on error
+          setIsLiked(previousIsLiked);
+          setLikeCount(previousCount);
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du like:", error);
+      // Revert on error
+      setIsLiked(previousIsLiked);
+      setLikeCount(previousCount);
+    }
+  };
+
+  const fetchCommentCount = async () => {
+    try {
+      const response = await fetch(`/api/events/${event.id}/comments`);
+      if (response.ok) {
+        const data = await response.json();
+        // Compter tous les commentaires (principaux + réponses)
+        const totalCount = data.reduce((acc: number, comment: any) => {
+          return acc + 1 + (comment.replies?.length || 0);
+        }, 0);
+        setCommentCount(totalCount);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement du nombre de commentaires:", error);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const url = `${window.location.origin}/events/${event.id}`;
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: "Lien copié",
+        description: "Le lien de l'événement a été copié dans le presse-papier.",
+      });
+    } catch (error) {
+      console.error("Erreur lors de la copie du lien:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de copier le lien",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatEventTime = () => {
@@ -357,27 +450,48 @@ export function EventCard({
           ) : (
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLike}
+                    disabled={loadingLikes}
+                    className={`p-0 h-7 w-7 ${
+                      isLiked ? "text-red-500" : "text-muted-foreground"
+                    } hover:text-red-500`}
+                  >
+                    <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
+                  </Button>
+                  {likeCount > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {likeCount}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowComments(!showComments);
+                      if (!showComments) {
+                        fetchCommentCount();
+                      }
+                    }}
+                    className="p-0 h-7 w-7 text-muted-foreground hover:text-foreground"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                  {commentCount > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {commentCount}
+                    </span>
+                  )}
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleLike}
-                  className={`p-0 h-7 w-7 ${
-                    isLiked ? "text-red-500" : "text-muted-foreground"
-                  } hover:text-red-500`}
-                >
-                  <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowComments(!showComments)}
-                  className="p-0 h-7 w-7 text-muted-foreground hover:text-foreground"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                  onClick={handleShare}
                   className="p-0 h-7 w-7 text-muted-foreground hover:text-foreground"
                 >
                   <Share2 className="h-4 w-4" />
@@ -390,18 +504,13 @@ export function EventCard({
               </Link>
             </div>
           )}
-          <div className="text-xs text-muted-foreground">
-            {likeCount > 0 && `${likeCount} like${likeCount > 1 ? "s" : ""}`}
-          </div>
         </div>
 
-        {/* Section commentaires (placeholder) */}
+        {/* Section commentaires */}
         {showComments && (
           <div className="px-3 pb-3 border-t bg-muted">
             <div className="py-2">
-              <p className="text-xs text-muted-foreground text-center">
-                Commentaires en cours de développement...
-              </p>
+              <EventCommentSection eventId={event.id} onCommentAdded={fetchCommentCount} />
             </div>
           </div>
         )}

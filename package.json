@@ -16,7 +16,11 @@
     "db:apply-background-fields": "tsx scripts/apply-background-fields-migration.ts",
     "db:apply-recurrence-group-id": "tsx scripts/apply-recurrence-group-id-migration.ts",
     "db:apply-online-status-social": "tsx scripts/apply-online-status-and-social-links-migration.ts",
-    "db:apply-referenced-city": "tsx scripts/apply-referenced-city-migration.ts"
+    "db:apply-referenced-city": "tsx scripts/apply-referenced-city-migration.ts",
+    "db:apply-likes-comments": "tsx scripts/apply-likes-and-event-comments-migration.ts",
+    "db:apply-comment-likes": "tsx scripts/apply-comment-likes-migration.ts",
+    "db:apply-user-follows": "tsx scripts/apply-user-follows-migration.ts",
+    "db:apply-notifications": "tsx scripts/apply-notifications-migration.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { events, eventParticipants, users, companies } from "@/lib/schema";
 import { eq, and, asc } from "drizzle-orm";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
+import { createNotification } from "@/lib/notifications";
 
 // GET - Liste des participants d'un événement
 export async function GET(
@@ -94,6 +95,7 @@ export async function POST(
         status: events.status,
         startDate: events.startDate,
         maxParticipants: events.maxParticipants,
+        companyId: events.companyId,
       })
       .from(events)
       .where(eq(events.id, eventIdNum))
@@ -153,10 +155,22 @@ export async function POST(
       );
     }
 
-    // Déterminer le statut (confirmed ou waitlisted)
-    let participantStatus: "confirmed" | "waitlisted" = "confirmed";
+    // Vérifier si la validation manuelle est activée (via le body de la requête)
+    let requiresManualApproval = false;
+    try {
+      const body = await request.json();
+      requiresManualApproval = body.requiresManualApproval === true;
+    } catch {
+      // Pas de body, utiliser le comportement par défaut
+    }
 
-    if (event.maxParticipants) {
+    // Déterminer le statut (pending, confirmed ou waitlisted)
+    let participantStatus: "pending" | "confirmed" | "waitlisted" = "confirmed";
+
+    if (requiresManualApproval) {
+      // Si validation manuelle activée, mettre en pending
+      participantStatus = "pending";
+    } else if (event.maxParticipants) {
       // Compter les participants confirmés
       const confirmedCount = await db
         .select({ id: eventParticipants.id })
@@ -183,11 +197,35 @@ export async function POST(
       })
       .returning();
 
+    // Créer une notification pour l'entreprise propriétaire de l'événement
+    const eventData = eventResult[0];
+    if (eventData.companyId) {
+      // Récupérer le userId de l'entreprise
+      const companyData = await db
+        .select({ userId: companies.userId })
+        .from(companies)
+        .where(eq(companies.id, eventData.companyId))
+        .limit(1);
+
+      if (companyData.length > 0) {
+        await createNotification({
+          userId: companyData[0].userId,
+          type: "event_registration",
+          relatedUserId: userId,
+          relatedCompanyId: eventData.companyId,
+          relatedEventId: eventIdNum,
+          relatedParticipantId: newParticipant[0].id,
+        });
+      }
+    }
+
     return NextResponse.json(
       {
         ...newParticipant[0],
         message:
-          participantStatus === "waitlisted"
+          participantStatus === "pending"
+            ? "Votre candidature est en attente de validation"
+            : participantStatus === "waitlisted"
             ? "Vous avez été ajouté à la liste d'attente"
             : "Inscription confirmée",
       },

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   Calendar,
@@ -10,6 +11,7 @@ import {
   Newspaper,
   User,
   Users,
+  Bell,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -77,18 +79,49 @@ const navItems = [
     url: "/profile",
     icon: User,
   },
+  {
+    title: "Notifications",
+    url: "/notifications",
+    icon: Bell,
+  },
 ];
 
 export function UserSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
+  const [backgroundGradient, setBackgroundGradient] = useState<{
+    color1: string;
+    color2: string;
+    css: string;
+  } | null>(null);
 
   const user = {
     name: session?.user?.name || "User",
     email: session?.user?.email || "",
     avatar: session?.user?.image || "",
   };
+
+  // Charger le gradient de l'utilisateur
+  useEffect(() => {
+    const loadUserGradient = async () => {
+      try {
+        const response = await fetch("/api/user/profile");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.backgroundType === "gradient" && data.backgroundGradient) {
+            setBackgroundGradient(data.backgroundGradient);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement du gradient:", error);
+      }
+    };
+
+    if (session?.user) {
+      loadUserGradient();
+    }
+  }, [session]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -121,7 +154,11 @@ export function UserSidebar({
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} accountType="user" />
+        <NavUser
+          user={user}
+          accountType="user"
+          backgroundGradient={backgroundGradient}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

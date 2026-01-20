@@ -196,11 +196,30 @@ export default function CompanyProfilePage() {
       }
     };
 
+    const loadCompanyStats = async () => {
+      try {
+        const response = await fetch("/api/company/stats");
+        if (response.ok) {
+          const stats = await response.json();
+          setCompanyStats(stats);
+        } else {
+          console.error("Erreur lors du chargement des statistiques");
+          // Garder les valeurs par défaut (0)
+        }
+      } catch (error) {
+        console.error("Erreur réseau lors du chargement des statistiques:", error);
+        // Garder les valeurs par défaut (0)
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     if (
       status === "authenticated" &&
       session?.user?.accountType === "business"
     ) {
       loadCompanyData();
+      loadCompanyStats();
     }
   }, [status, session]);
 
@@ -268,6 +287,15 @@ export default function CompanyProfilePage() {
     instagramUrl: "",
     tiktokUrl: "",
     linkedinUrl: "",
+  });
+
+  // Statistiques de l'entreprise
+  const [companyStats, setCompanyStats] = useState<{
+    activeEvents: number;
+    followers: number;
+  }>({
+    activeEvents: 0,
+    followers: 0,
   });
 
   const [formData, setFormData] = useState(companyData);
@@ -975,21 +1003,15 @@ export default function CompanyProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">0</div>
+                  <div className="text-2xl font-bold">{companyStats.activeEvents}</div>
                   <p className="text-sm text-muted-foreground">
                     Événements actifs
                   </p>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">0</div>
-                  <p className="text-sm text-muted-foreground">
-                    Projets en cours
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">0</div>
+                  <div className="text-2xl font-bold">{companyStats.followers}</div>
                   <p className="text-sm text-muted-foreground">Abonnés</p>
                 </div>
               </div>

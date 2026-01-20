@@ -8,53 +8,53 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
-    Calendar,
-    MapPin,
-    Users,
-    Clock,
-    ArrowLeft,
-    RefreshCw,
-    Mail,
-    Phone,
-    ExternalLink,
-    CheckCircle2,
-    AlertCircle,
+  Calendar,
+  MapPin,
+  Users,
+  Clock, RefreshCw,
+  Mail,
+  Phone,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  Heart
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DynamicSidebar } from "@/components/dynamic-sidebar";
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useScroll } from "@/hooks/use-scroll";
 import {
-    EVENT_TYPES,
-    RECURRENCE_TYPES,
-    EventType,
-    EventStatus,
-    ParticipantStatus,
+  EVENT_TYPES,
+  RECURRENCE_TYPES,
+  EventType,
+  EventStatus,
+  ParticipantStatus,
 } from "@/lib/schema";
 import { cn } from "@/lib/utils";
+import { EventCommentSection } from "@/components/event-comment-section";
 
 // Couleurs par type d'événement
 const eventTypeColors: Record<EventType, string> = {
@@ -129,6 +129,9 @@ export default function EventDetailPage({
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [loadingLikes, setLoadingLikes] = useState(true);
   const hasScrolled = useScroll();
 
   const fetchEvent = useCallback(async () => {
@@ -169,6 +172,91 @@ export default function EventDetailPage({
     if (sessionStatus === "loading") return;
     fetchEvent();
   }, [sessionStatus, fetchEvent]);
+
+  const fetchLikes = useCallback(async () => {
+    if (sessionStatus !== "authenticated") {
+      setLoadingLikes(false);
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/events/${resolvedParams.eventId}/likes`);
+      if (response.ok) {
+        const data = await response.json();
+        setLikeCount(data.count || 0);
+        setIsLiked(data.isLiked || false);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des likes:", error);
+    } finally {
+      setLoadingLikes(false);
+    }
+  }, [resolvedParams.eventId, sessionStatus]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    fetchLikes();
+  }, [sessionStatus, fetchLikes]);
+
+  const handleLike = async () => {
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+
+    const previousIsLiked = isLiked;
+    const previousCount = likeCount;
+
+    // Optimistic update
+    setIsLiked(!isLiked);
+    setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
+
+    try {
+      if (previousIsLiked) {
+        // Supprimer le like
+        const response = await fetch(`/api/events/${resolvedParams.eventId}/likes`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          // Revert on error
+          setIsLiked(previousIsLiked);
+          setLikeCount(previousCount);
+          const error = await response.json();
+          toast({
+            title: "Erreur",
+            description: error.error || "Impossible de retirer le like",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Ajouter le like
+        const response = await fetch(`/api/events/${resolvedParams.eventId}/likes`, {
+          method: "POST",
+        });
+        if (!response.ok) {
+          // Revert on error
+          setIsLiked(previousIsLiked);
+          setLikeCount(previousCount);
+          const error = await response.json();
+          toast({
+            title: "Erreur",
+            description: error.error || "Impossible d'ajouter le like",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du like:", error);
+      // Revert on error
+      setIsLiked(previousIsLiked);
+      setLikeCount(previousCount);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleRegister = async () => {
     if (!session) {
@@ -321,6 +409,12 @@ export default function EventDetailPage({
   };
 
   const background = getBackground();
+  const bannerStyle =
+    background?.type === "gradient"
+      ? { background: background.value }
+      : background?.type === "image"
+      ? {}
+      : { background: "linear-gradient(to bottom, #f3f4f6, #ffffff)" };
 
   return (
     <SidebarProvider>
@@ -352,78 +446,40 @@ export default function EventDetailPage({
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-6">
-          {/* Bouton retour */}
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/events")}
-            className="mb-2 w-fit"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Retour aux événements
-          </Button>
+        <div className="flex flex-1 flex-col">
+          {/* Bannière pleine largeur */}
+          <div className="relative h-48 w-full" style={bannerStyle}>
+            {background?.type === "image" && (
+              <Image
+                src={background.value}
+                alt={event.title}
+                fill
+                className="object-cover"
+              />
+            )}
+          </div>
 
-          {/* Contenu principal */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Colonne principale */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Card avec cover et header */}
-              <Card className="overflow-hidden p-0">
-                {/* Background Image or Gradient */}
-                <div className="relative h-32 w-full">
-                  {background ? (
-                    background.type === "image" ? (
-                      <Image
-                        src={background.value}
-                        alt={event.title}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full"
-                        style={{ background: background.value }}
-                      />
-                    )
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
-                  )}
-                </div>
-
-                <CardHeader className="pb-6">
-                  {/* Logo and Company Name */}
-                  {event.companyName && (
-                    <div className="flex items-start gap-4 -mt-12 relative z-10 mb-4">
-                      <div className="relative">
-                        <Avatar className="h-20 w-20 border-4 border-background">
-                          <AvatarImage src={event.companyLogo || undefined} />
-                          <AvatarFallback className="text-lg">
-                            {event.companyName
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()
-                              .slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                      </div>
-                      <div className="flex-1 pt-8">
-                        <p className="text-sm text-muted-foreground mb-1">
-                          Organisé par
-                        </p>
-                        <Link
-                          href={`/associations/${event.companyName}`}
-                          className="text-xl font-semibold hover:text-primary transition-colors"
-                        >
-                          {event.companyName}
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Title and Badges */}
-                  <div className="space-y-3">
-                    <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
+            {/* Header avec avatar qui chevauche */}
+            <div className="flex flex-col md:flex-row gap-4 -mt-16">
+              {event.companyName && (
+                <Avatar className="h-32 w-32 border-4 border-background flex-shrink-0">
+                  <AvatarImage src={event.companyLogo || ""} />
+                  <AvatarFallback className="text-lg">
+                    {event.companyName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              <div className="flex-1 pt-20 md:pt-24">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold">{event.title}</h1>
+                    <div className="flex gap-2 flex-wrap mt-2">
                       <Badge
                         variant="outline"
                         className={eventTypeColors[event.eventType]}
@@ -454,14 +510,37 @@ export default function EventDetailPage({
                         </Badge>
                       )}
                     </div>
-                    <CardTitle className="text-3xl">{event.title}</CardTitle>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-6 pb-6">
-                  {/* Date et heure */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
+                </div>
+                {event.companyName && (
+                  <div className="mt-4">
+                    <p className="text-sm text-muted-foreground mb-1">
+                      Organisé par
+                    </p>
+                    <Link
+                      href={`/associations/${event.companyName}`}
+                      className="text-lg font-semibold hover:text-primary transition-colors"
+                    >
+                      {event.companyName}
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Grid avec contenu principal et sidebar */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Colonne principale */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Card avec les détails */}
+                <Card>
+                  <CardContent className="space-y-6 pt-6">
+                    {/* Date et heure */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
                         <Calendar className="h-5 w-5 text-muted-foreground" />
                         <div>
                           <p className="font-medium">Date</p>
@@ -481,9 +560,9 @@ export default function EventDetailPage({
                           </p>
                         </div>
                       </div>
-                    </div>
-                    <div className="space-y-3">
-                      {(event.location || event.city) && (
+                      </div>
+                      <div className="space-y-3">
+                        {(event.location || event.city) && (
                         <div className="flex items-start gap-3">
                           <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <div>
@@ -503,8 +582,8 @@ export default function EventDetailPage({
                             )}
                           </div>
                         </div>
-                      )}
-                      <div className="flex items-center gap-3">
+                        )}
+                        <div className="flex items-center gap-3">
                         <Users className="h-5 w-5 text-muted-foreground" />
                         <div>
                           <p className="font-medium">Participants</p>
@@ -517,122 +596,132 @@ export default function EventDetailPage({
                           </p>
                         </div>
                       </div>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Description */}
-                  {event.description && (
-                    <>
-                      <Separator />
-                      <div>
-                        <h3 className="font-semibold mb-2">Description</h3>
-                        <p className="text-muted-foreground whitespace-pre-wrap">
-                          {event.description}
-                        </p>
-                      </div>
-                    </>
-                  )}
+                    {/* Description */}
+                    {event.description && (
+                      <>
+                        <Separator />
+                        <div>
+                          <h3 className="font-semibold mb-2">Description</h3>
+                          <p className="text-muted-foreground whitespace-pre-wrap">
+                            {event.description}
+                          </p>
+                        </div>
+                      </>
+                    )}
 
-                  {/* Informations supplémentaires */}
-                  {(event.requirements ||
-                    event.targetAudience ||
-                    event.isPaid ||
-                    event.contactEmail ||
-                    event.contactPhone ||
-                    event.externalLink) && (
-                    <>
-                      <Separator />
-                      <div className="space-y-4">
-                        {event.requirements && (
-                          <div>
-                            <h3 className="font-semibold mb-2">Prérequis / À apporter</h3>
-                            <p className="text-muted-foreground whitespace-pre-wrap">
-                              {event.requirements}
-                            </p>
-                          </div>
-                        )}
-                        {event.targetAudience && (
-                          <div>
-                            <h3 className="font-semibold mb-2">Public cible</h3>
-                            <p className="text-muted-foreground">{event.targetAudience}</p>
-                          </div>
-                        )}
-                        {event.isPaid && event.price && (
-                          <div>
-                            <h3 className="font-semibold mb-2">Tarif</h3>
-                            <p className="text-muted-foreground">
-                              {event.price} {event.currency}
-                            </p>
-                          </div>
-                        )}
-                        {(event.contactEmail || event.contactPhone || event.externalLink) && (
-                          <div>
-                            <h3 className="font-semibold mb-2">Contact</h3>
-                            <div className="space-y-2">
-                              {event.contactEmail && (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Mail className="h-4 w-4" />
-                                  <a
-                                    href={`mailto:${event.contactEmail}`}
-                                    className="hover:text-primary hover:underline"
-                                  >
-                                    {event.contactEmail}
-                                  </a>
-                                </div>
-                              )}
-                              {event.contactPhone && (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Phone className="h-4 w-4" />
-                                  <a
-                                    href={`tel:${event.contactPhone}`}
-                                    className="hover:text-primary hover:underline"
-                                  >
-                                    {event.contactPhone}
-                                  </a>
-                                </div>
-                              )}
-                              {event.externalLink && (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <ExternalLink className="h-4 w-4" />
-                                  <a
-                                    href={event.externalLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="hover:text-primary hover:underline"
-                                  >
-                                    Lien externe
-                                  </a>
-                                </div>
-                              )}
+                    {/* Informations supplémentaires */}
+                    {(event.requirements ||
+                      event.targetAudience ||
+                      event.isPaid ||
+                      event.contactEmail ||
+                      event.contactPhone ||
+                      event.externalLink) && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          {event.requirements && (
+                            <div>
+                              <h3 className="font-semibold mb-2">Prérequis / À apporter</h3>
+                              <p className="text-muted-foreground whitespace-pre-wrap">
+                                {event.requirements}
+                              </p>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                          )}
+                          {event.targetAudience && (
+                            <div>
+                              <h3 className="font-semibold mb-2">Public cible</h3>
+                              <p className="text-muted-foreground">{event.targetAudience}</p>
+                            </div>
+                          )}
+                          {event.isPaid && event.price && (
+                            <div>
+                              <h3 className="font-semibold mb-2">Tarif</h3>
+                              <p className="text-muted-foreground">
+                                {event.price} {event.currency}
+                              </p>
+                            </div>
+                          )}
+                          {(event.contactEmail || event.contactPhone || event.externalLink) && (
+                            <div>
+                              <h3 className="font-semibold mb-2">Contact</h3>
+                              <div className="space-y-2">
+                                {event.contactEmail && (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Mail className="h-4 w-4" />
+                                    <a
+                                      href={`mailto:${event.contactEmail}`}
+                                      className="hover:text-primary hover:underline"
+                                    >
+                                      {event.contactEmail}
+                                    </a>
+                                  </div>
+                                )}
+                                {event.contactPhone && (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Phone className="h-4 w-4" />
+                                    <a
+                                      href={`tel:${event.contactPhone}`}
+                                      className="hover:text-primary hover:underline"
+                                    >
+                                      {event.contactPhone}
+                                    </a>
+                                  </div>
+                                )}
+                                {event.externalLink && (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <ExternalLink className="h-4 w-4" />
+                                    <a
+                                      href={event.externalLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:text-primary hover:underline"
+                                    >
+                                      Lien externe
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
 
-            {/* Colonne latérale */}
-            <div className="space-y-6">
-              {/* Actions d'inscription */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Inscription</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {!session ? (
-                    <div className="space-y-3">
+                {/* Section Commentaires */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Commentaires</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <EventCommentSection eventId={event.id} />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Colonne latérale */}
+              <div className="space-y-6">
+                {/* Actions d'inscription */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Inscription</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!session ? (
+                      <div className="space-y-3">
                       <p className="text-sm text-muted-foreground">
                         Connectez-vous pour vous inscrire à cet événement.
                       </p>
                       <Button className="w-full" onClick={() => router.push("/login")}>
                         Se connecter
                       </Button>
-                    </div>
-                  ) : event.currentUserStatus === "confirmed" ? (
-                    <div className="space-y-3">
+                      </div>
+                    ) : event.currentUserStatus === "confirmed" ? (
+                      <div className="space-y-3">
                       <div className="flex items-center gap-2 text-green-600">
                         <CheckCircle2 className="h-5 w-5" />
                         <p className="font-medium">Vous êtes inscrit</p>
@@ -650,9 +739,9 @@ export default function EventDetailPage({
                           Cet événement est passé, vous ne pouvez plus vous désinscrire.
                         </p>
                       )}
-                    </div>
-                  ) : event.currentUserStatus === "waitlisted" ? (
-                    <div className="space-y-3">
+                      </div>
+                    ) : event.currentUserStatus === "waitlisted" ? (
+                      <div className="space-y-3">
                       <div className="flex items-center gap-2 text-orange-600">
                         <AlertCircle className="h-5 w-5" />
                         <p className="font-medium">Vous êtes en liste d&apos;attente</p>
@@ -668,9 +757,9 @@ export default function EventDetailPage({
                       >
                         {registering ? "Traitement..." : "Se désinscrire"}
                       </Button>
-                    </div>
-                  ) : canRegister ? (
-                    <div className="space-y-3">
+                      </div>
+                    ) : canRegister ? (
+                      <div className="space-y-3">
                       {isFull ? (
                         <>
                           <p className="text-sm text-muted-foreground">
@@ -696,9 +785,9 @@ export default function EventDetailPage({
                           {registering ? "Traitement..." : "S'inscrire"}
                         </Button>
                       )}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
                       {isPast ? (
                         <p className="text-sm text-muted-foreground">
                           Cet événement est déjà passé.
@@ -708,8 +797,8 @@ export default function EventDetailPage({
                           Cet événement n&apos;est pas encore publié.
                         </p>
                       ) : null}
-                    </div>
-                  )}
+                      </div>
+                    )}
 
                   {/* Barre de progression si capacité limitée */}
                   {event.maxParticipants && (
@@ -739,6 +828,51 @@ export default function EventDetailPage({
                       </div>
                     </div>
                   )}
+                  </CardContent>
+                </Card>
+
+                {/* Section Likes */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Likes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {!session ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Connectez-vous pour aimer cet événement.
+                      </p>
+                      <Button className="w-full" onClick={() => router.push("/login")}>
+                        Se connecter
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Button
+                        variant={isLiked ? "default" : "outline"}
+                        className="w-full"
+                        onClick={handleLike}
+                        disabled={loadingLikes}
+                      >
+                        <Heart
+                          className={cn(
+                            "h-4 w-4 mr-2",
+                            isLiked && "fill-current"
+                          )}
+                        />
+                        {loadingLikes
+                          ? "Chargement..."
+                          : isLiked
+                          ? "J'aime déjà"
+                          : "J'aime"}
+                      </Button>
+                      {likeCount > 0 && (
+                        <p className="text-sm text-center text-muted-foreground">
+                          {likeCount} {likeCount === 1 ? "personne aime" : "personnes aiment"} cet événement
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -762,6 +896,7 @@ export default function EventDetailPage({
                   </div>
                 </CardContent>
               </Card>
+              </div>
             </div>
           </div>
         </div>

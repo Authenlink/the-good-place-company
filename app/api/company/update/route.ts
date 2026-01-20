@@ -155,28 +155,47 @@ export async function PUT(request: NextRequest) {
       updateData.coordinates = coordinates;
     }
 
-    console.log("💾 Mise à jour de l'entreprise dans la base de données...");
+    console.log("💾 Mise à jour/création de l'entreprise dans la base de données...");
     console.log(
       "📋 Données à mettre à jour:",
       JSON.stringify(updateData, null, 2)
     );
 
-    // Mettre à jour l'entreprise dans la base de données
-    const result = await db
-      .update(companies)
-      .set(updateData)
+    // Vérifier si l'entreprise existe déjà
+    const existingCompany = await db
+      .select()
+      .from(companies)
       .where(eq(companies.userId, userId))
-      .returning();
+      .limit(1);
+
+    let result;
+    if (existingCompany.length > 0) {
+      // Mise à jour de l'entreprise existante
+      console.log("🔄 Mise à jour de l'entreprise existante");
+      result = await db
+        .update(companies)
+        .set(updateData)
+        .where(eq(companies.userId, userId))
+        .returning();
+    } else {
+      // Création d'une nouvelle entreprise
+      console.log("🆕 Création d'une nouvelle entreprise");
+      const createData = {
+        userId,
+        ...updateData,
+      };
+      result = await db.insert(companies).values(createData).returning();
+    }
 
     console.log(
-      "📊 Résultat de la requête UPDATE:",
+      "📊 Résultat de la requête:",
       JSON.stringify(result, null, 2)
     );
 
     if (result.length === 0) {
       return NextResponse.json(
-        { error: "Entreprise non trouvée ou non autorisée" },
-        { status: 404 }
+        { error: "Erreur lors de la sauvegarde de l'entreprise" },
+        { status: 500 }
       );
     }
 

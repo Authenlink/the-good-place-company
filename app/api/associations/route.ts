@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
         description: companies.description,
         logo: companies.logo,
         background: companies.background,
+        backgroundType: companies.backgroundType,
+        backgroundGradient: companies.backgroundGradient,
         areaId: companies.areaId,
         areaName: areas.name,
         values: companies.values,
@@ -89,6 +91,9 @@ export async function GET(request: NextRequest) {
       description: association.description || "",
       logo: association.logo,
       banner: association.background, // background devient banner pour le frontend
+      background: association.background,
+      backgroundType: association.backgroundType,
+      backgroundGradient: association.backgroundGradient,
       category: association.areaName || "Autre",
       location: association.address || "",
       website: association.website,

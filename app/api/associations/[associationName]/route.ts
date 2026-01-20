@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { companies, areas, companyValues } from "@/lib/schema";
-import { eq, inArray } from "drizzle-orm";
+import {
+  companies,
+  areas,
+  companyValues,
+  events,
+  projects,
+  companyFollowers,
+} from "@/lib/schema";
+import { eq, inArray, and, asc } from "drizzle-orm";
+import { auth } from "@/app/api/auth/[...nextauth]/route";
 
 export async function GET(
   request: NextRequest,
@@ -89,6 +97,77 @@ export async function GET(
       }
     }
 
+    // Récupérer les événements publiés de l'association
+    const associationEvents = await db
+      .select({
+        id: events.id,
+        title: events.title,
+        description: events.description,
+        eventType: events.eventType,
+        startDate: events.startDate,
+        endDate: events.endDate,
+        location: events.location,
+        city: events.city,
+        images: events.images,
+        coverImage: events.coverImage,
+        status: events.status,
+      })
+      .from(events)
+      .where(
+        and(
+          eq(events.companyId, associationData.id),
+          eq(events.status, "published")
+        )
+      )
+      .orderBy(asc(events.startDate))
+      .limit(20); // Limiter à 20 événements récents
+
+    // Récupérer les projets actifs de l'association
+    const associationProjects = await db
+      .select({
+        id: projects.id,
+        title: projects.title,
+        shortDescription: projects.shortDescription,
+        fullDescription: projects.fullDescription,
+        bannerImage: projects.bannerImage,
+        tags: projects.tags,
+        customTags: projects.customTags,
+        status: projects.status,
+        createdAt: projects.createdAt,
+      })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.companyId, associationData.id),
+          eq(projects.status, "active")
+        )
+      )
+      .orderBy(asc(projects.createdAt))
+      .limit(20); // Limiter à 20 projets récents
+
+    // Vérifier si l'user connecté suit cette association
+    let isFollowing = false;
+    try {
+      const session = await auth();
+      if (session?.user && session.user.accountType === "user") {
+        const userId = parseInt(session.user.id);
+        const followCheck = await db
+          .select()
+          .from(companyFollowers)
+          .where(
+            and(
+              eq(companyFollowers.companyId, associationData.id),
+              eq(companyFollowers.userId, userId)
+            )
+          )
+          .limit(1);
+        isFollowing = followCheck.length > 0;
+      }
+    } catch (error) {
+      // Si erreur d'auth, on continue sans isFollowing
+      console.error("Erreur lors de la vérification du follow:", error);
+    }
+
     // Transformer les données pour correspondre au format attendu par le frontend
     const formattedAssociation = {
       id: associationData.id,
@@ -114,6 +193,9 @@ export async function GET(
       tiktokUrl: associationData.tiktokUrl || "",
       linkedinUrl: associationData.linkedinUrl || "",
       createdAt: associationData.createdAt?.toISOString() || "",
+      events: associationEvents,
+      projects: associationProjects,
+      isFollowing,
     };
 
     return NextResponse.json({

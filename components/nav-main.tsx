@@ -9,16 +9,17 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarMenu,
+  SidebarGroup, SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBadge } from "@/components/notification-badge";
+import { Bell } from "lucide-react";
 
 export function NavMain({
   items,
@@ -36,9 +37,11 @@ export function NavMain({
     }[];
   }[];
 }) {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
           // Items without sub-items: direct link
@@ -63,9 +66,26 @@ export function NavMain({
                   </SidebarMenuButton>
                 ) : (
                   <SidebarMenuButton tooltip={item.title} asChild>
-                    <Link href={item.url}>
-                      {item.icon && <item.icon />}
-                      <span>{item.title}</span>
+                    <Link href={item.url} className="flex items-center gap-2 w-full relative">
+                      {item.title === "Notifications" ? (
+                        <>
+                          <div className="relative flex items-center justify-center">
+                            <Bell className="h-4 w-4 relative z-10" />
+                            {isCollapsed && <NotificationBadge isCollapsed={isCollapsed} />}
+                          </div>
+                          {!isCollapsed && (
+                            <>
+                              <span>Notifications</span>
+                              <NotificationBadge isCollapsed={isCollapsed} />
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {item.icon && <item.icon />}
+                          {!isCollapsed && <span>{item.title}</span>}
+                        </>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 )}

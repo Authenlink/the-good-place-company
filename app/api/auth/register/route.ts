@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { users, companies } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { generateRandomGradient } from "@/lib/gradient-generator";
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,6 +86,9 @@ export async function POST(request: NextRequest) {
     // Hacher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Générer un gradient automatiquement pour l'utilisateur
+    const userGradient = generateRandomGradient();
+
     // Créer l'utilisateur
     const newUser = await db
       .insert(users)
@@ -93,6 +97,8 @@ export async function POST(request: NextRequest) {
         name,
         password: hashedPassword,
         accountType,
+        backgroundType: "gradient",
+        backgroundGradient: userGradient,
       })
       .returning();
 
@@ -101,6 +107,9 @@ export async function POST(request: NextRequest) {
     // Si compte business, créer l'entrée dans la table companies
     let companyData = null;
     if (accountType === "business") {
+      // Générer un gradient automatiquement pour l'entreprise
+      const companyGradient = generateRandomGradient();
+
       const newCompany = await db
         .insert(companies)
         .values({
@@ -109,6 +118,8 @@ export async function POST(request: NextRequest) {
           description: companyDescription || null,
           address: companyAddress,
           city: companyCity,
+          backgroundType: "gradient",
+          backgroundGradient: companyGradient,
         })
         .returning();
 

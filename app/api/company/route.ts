@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { companies, areas } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
+import { generateRandomGradient } from "@/lib/gradient-generator";
 
 // Fonction pour géocoder une adresse
 async function geocodeAddress(
@@ -187,6 +188,8 @@ export async function POST(request: NextRequest) {
       description,
       logo,
       background,
+      backgroundGradient: providedBackgroundGradient,
+      backgroundType: providedBackgroundType,
       areaId,
       values,
       email,
@@ -247,6 +250,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Gérer le background et le gradient
+    let backgroundType: "image" | "gradient" | null = null;
+    let backgroundGradient = null;
+    
+    // Si un backgroundType et backgroundGradient sont fournis explicitement, les utiliser
+    if (providedBackgroundType === "gradient" && providedBackgroundGradient) {
+      backgroundType = "gradient";
+      backgroundGradient = providedBackgroundGradient;
+    } else if (background) {
+      // Si un background (image) est fourni, utiliser "image"
+      backgroundType = "image";
+    } else {
+      // Sinon, générer un gradient automatiquement
+      const generatedGradient = generateRandomGradient();
+      backgroundType = "gradient";
+      backgroundGradient = generatedGradient;
+    }
+
     // Préparer les données pour la création
     const createData: any = {
       userId,
@@ -254,6 +275,8 @@ export async function POST(request: NextRequest) {
       description: description?.trim() || null,
       logo: logo || null,
       background: background || null,
+      backgroundType,
+      backgroundGradient,
       areaId: areaId ? parseInt(areaId) : null,
       values: values || [],
       email: email?.trim() || null,

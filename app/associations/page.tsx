@@ -29,6 +29,13 @@ interface Association {
   description: string;
   logo?: string;
   banner?: string;
+  background?: string;
+  backgroundType?: "image" | "gradient" | null;
+  backgroundGradient?: {
+    color1: string;
+    color2: string;
+    css: string;
+  } | null;
   category: string;
   location: string;
   website?: string;
@@ -261,9 +268,16 @@ export default function AssociationsPage() {
                 >
                   {/* Banner en haut, collée sans padding */}
                   <div className="h-24 bg-muted relative overflow-hidden">
-                    {association.banner ? (
+                    {association.backgroundType === "gradient" &&
+                    association.backgroundGradient ? (
+                      <div
+                        className="w-full h-full"
+                        style={{ background: association.backgroundGradient.css }}
+                      />
+                    ) : association.backgroundType === "image" &&
+                      (association.banner || association.background) ? (
                       <Image
-                        src={association.banner}
+                        src={association.banner || association.background || ""}
                         alt={`${association.name} banner`}
                         fill
                         className="object-cover"
@@ -299,7 +313,7 @@ export default function AssociationsPage() {
                       </div>
                     </div>
 
-                    {/* Secteur et localisation - alignés à gauche comme la description */}
+                    {/* Secteur et localisation */}
                     <div className="space-y-1 mb-3">
                       <Badge variant="secondary" className="text-xs">
                         {association.category}
@@ -310,11 +324,6 @@ export default function AssociationsPage() {
                         </p>
                       )}
                     </div>
-
-                    {/* Description */}
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                      {association.description}
-                    </p>
 
                     {/* Tags des valeurs en bas */}
                     {association.values && association.values.length > 0 ? (

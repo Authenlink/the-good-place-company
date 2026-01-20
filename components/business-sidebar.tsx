@@ -1,13 +1,16 @@
 "use client";
 
 import * as React from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   BarChart3,
-  Calendar, LayoutDashboard,
+  Calendar,
+  LayoutDashboard,
   MessageSquare,
   Settings,
-  Users
+  Users,
+  Bell,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -107,6 +110,11 @@ const navItems = [
     comingSoon: true,
   },
   {
+    title: "Notifications",
+    url: "/notifications",
+    icon: Bell,
+  },
+  {
     title: "Paramètres",
     url: "/business/settings",
     icon: Settings,
@@ -127,12 +135,38 @@ export function BusinessSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession();
+  const [backgroundGradient, setBackgroundGradient] = useState<{
+    color1: string;
+    color2: string;
+    css: string;
+  } | null>(null);
 
   const user = {
     name: session?.user?.name || "Business",
     email: session?.user?.email || "",
     avatar: session?.user?.image || "",
   };
+
+  // Charger le gradient de l'utilisateur
+  useEffect(() => {
+    const loadUserGradient = async () => {
+      try {
+        const response = await fetch("/api/user/profile");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.backgroundType === "gradient" && data.backgroundGradient) {
+            setBackgroundGradient(data.backgroundGradient);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement du gradient:", error);
+      }
+    };
+
+    if (session?.user) {
+      loadUserGradient();
+    }
+  }, [session]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -165,7 +199,11 @@ export function BusinessSidebar({
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} accountType="business" />
+        <NavUser
+          user={user}
+          accountType="business"
+          backgroundGradient={backgroundGradient}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

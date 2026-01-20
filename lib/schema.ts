@@ -225,6 +225,7 @@ export type EventStatus = keyof typeof EVENT_STATUSES;
 
 // Statuts de participant
 export const PARTICIPANT_STATUSES = {
+  pending: "En attente de validation",
   confirmed: "Inscrit",
   waitlisted: "Liste d'attente",
   cancelled: "Annulé",
@@ -369,6 +370,115 @@ export const companyFollowers = pgTable("company_followers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Table user_follows pour les abonnements entre utilisateurs
+export const userFollows = pgTable("user_follows", {
+  id: serial("id").primaryKey(),
+  followerId: integer("follower_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  followingId: integer("following_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Table post_likes pour les likes sur les posts
+export const postLikes = pgTable("post_likes", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id")
+    .notNull()
+    .references(() => posts.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Table event_likes pour les likes sur les événements
+export const eventLikes = pgTable("event_likes", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Table event_comments pour les commentaires sur les événements
+export const eventComments = pgTable("event_comments", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id").references((): any => eventComments.id, { onDelete: "cascade" }), // Pour les réponses aux commentaires
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Table comment_likes pour les likes sur les commentaires de posts
+export const commentLikes = pgTable("comment_likes", {
+  id: serial("id").primaryKey(),
+  commentId: integer("comment_id")
+    .notNull()
+    .references(() => comments.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Table event_comment_likes pour les likes sur les commentaires d'événements
+export const eventCommentLikes = pgTable("event_comment_likes", {
+  id: serial("id").primaryKey(),
+  eventCommentId: integer("event_comment_id")
+    .notNull()
+    .references(() => eventComments.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Types de notifications
+export const NOTIFICATION_TYPES = {
+  // Pour les entreprises
+  company_followed: "company_followed",
+  event_registration: "event_registration",
+  post_liked: "post_liked",
+  event_liked: "event_liked",
+  post_commented: "post_commented",
+  event_commented: "event_commented",
+  // Pour les utilisateurs
+  user_followed: "user_followed",
+  comment_liked: "comment_liked",
+  event_comment_liked: "event_comment_liked",
+  event_registration_confirmed: "event_registration_confirmed",
+  event_registration_rejected: "event_registration_rejected",
+  event_registration_waitlisted: "event_registration_waitlisted",
+} as const;
+
+export type NotificationType = keyof typeof NOTIFICATION_TYPES;
+
+// Table notifications
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull().$type<NotificationType>(),
+  relatedUserId: integer("related_user_id").references(() => users.id, { onDelete: "set null" }),
+  relatedCompanyId: integer("related_company_id").references(() => companies.id, { onDelete: "set null" }),
+  relatedPostId: integer("related_post_id").references(() => posts.id, { onDelete: "cascade" }),
+  relatedEventId: integer("related_event_id").references(() => events.id, { onDelete: "cascade" }),
+  relatedCommentId: integer("related_comment_id").references(() => comments.id, { onDelete: "cascade" }),
+  relatedEventCommentId: integer("related_event_comment_id").references(() => eventComments.id, { onDelete: "cascade" }),
+  relatedParticipantId: integer("related_participant_id").references(() => eventParticipants.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   accounts: many(accounts),
@@ -378,6 +488,18 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   comments: many(comments),
   eventParticipations: many(eventParticipants),
   companyFollows: many(companyFollowers),
+  following: many(userFollows, {
+    relationName: "follower",
+  }),
+  followers: many(userFollows, {
+    relationName: "following",
+  }),
+  postLikes: many(postLikes),
+  eventLikes: many(eventLikes),
+  eventComments: many(eventComments),
+  commentLikes: many(commentLikes),
+  eventCommentLikes: many(eventCommentLikes),
+  notifications: many(notifications),
 }));
 
 export const companiesRelations = relations(companies, ({ one, many }) => ({
@@ -394,6 +516,11 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   events: many(events),
   projects: many(projects),
   followers: many(companyFollowers),
+  postLikes: many(postLikes),
+  eventLikes: many(eventLikes),
+  eventComments: many(eventComments),
+  commentLikes: many(commentLikes),
+  eventCommentLikes: many(eventCommentLikes),
 }));
 
 export const projectsRelations = relations(projects, ({ one }) => ({
@@ -409,6 +536,8 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     references: [companies.id],
   }),
   participants: many(eventParticipants),
+  likes: many(eventLikes),
+  comments: many(eventComments),
 }));
 
 export const eventParticipantsRelations = relations(
@@ -435,6 +564,7 @@ export const postsRelations = relations(posts, ({ one, many }) => ({
     references: [companies.id],
   }),
   comments: many(comments),
+  likes: many(postLikes),
 }));
 
 export const commentsRelations = relations(comments, ({ one, many }) => ({
@@ -455,6 +585,7 @@ export const commentsRelations = relations(comments, ({ one, many }) => ({
     references: [comments.id],
   }),
   replies: many(comments),
+  likes: many(commentLikes),
 }));
 
 export const accountsRelations = relations(accounts, ({ one }) => ({
@@ -484,3 +615,136 @@ export const companyFollowersRelations = relations(
     }),
   })
 );
+
+export const userFollowsRelations = relations(
+  userFollows,
+  ({ one }) => ({
+    follower: one(users, {
+      fields: [userFollows.followerId],
+      references: [users.id],
+      relationName: "follower",
+    }),
+    following: one(users, {
+      fields: [userFollows.followingId],
+      references: [users.id],
+      relationName: "following",
+    }),
+  })
+);
+
+export const postLikesRelations = relations(postLikes, ({ one }) => ({
+  post: one(posts, {
+    fields: [postLikes.postId],
+    references: [posts.id],
+  }),
+  user: one(users, {
+    fields: [postLikes.userId],
+    references: [users.id],
+  }),
+  company: one(companies, {
+    fields: [postLikes.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const eventLikesRelations = relations(eventLikes, ({ one }) => ({
+  event: one(events, {
+    fields: [eventLikes.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [eventLikes.userId],
+    references: [users.id],
+  }),
+  company: one(companies, {
+    fields: [eventLikes.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const eventCommentsRelations = relations(eventComments, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventComments.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [eventComments.userId],
+    references: [users.id],
+  }),
+  company: one(companies, {
+    fields: [eventComments.companyId],
+    references: [companies.id],
+  }),
+  parent: one(eventComments, {
+    fields: [eventComments.parentId],
+    references: [eventComments.id],
+  }),
+  replies: many(eventComments),
+  likes: many(eventCommentLikes),
+}));
+
+export const commentLikesRelations = relations(commentLikes, ({ one }) => ({
+  comment: one(comments, {
+    fields: [commentLikes.commentId],
+    references: [comments.id],
+  }),
+  user: one(users, {
+    fields: [commentLikes.userId],
+    references: [users.id],
+  }),
+  company: one(companies, {
+    fields: [commentLikes.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const eventCommentLikesRelations = relations(eventCommentLikes, ({ one }) => ({
+  eventComment: one(eventComments, {
+    fields: [eventCommentLikes.eventCommentId],
+    references: [eventComments.id],
+  }),
+  user: one(users, {
+    fields: [eventCommentLikes.userId],
+    references: [users.id],
+  }),
+  company: one(companies, {
+    fields: [eventCommentLikes.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  relatedUser: one(users, {
+    fields: [notifications.relatedUserId],
+    references: [users.id],
+    relationName: "relatedUser",
+  }),
+  relatedCompany: one(companies, {
+    fields: [notifications.relatedCompanyId],
+    references: [companies.id],
+  }),
+  relatedPost: one(posts, {
+    fields: [notifications.relatedPostId],
+    references: [posts.id],
+  }),
+  relatedEvent: one(events, {
+    fields: [notifications.relatedEventId],
+    references: [events.id],
+  }),
+  relatedComment: one(comments, {
+    fields: [notifications.relatedCommentId],
+    references: [comments.id],
+  }),
+  relatedEventComment: one(eventComments, {
+    fields: [notifications.relatedEventCommentId],
+    references: [eventComments.id],
+  }),
+  relatedParticipant: one(eventParticipants, {
+    fields: [notifications.relatedParticipantId],
+    references: [eventParticipants.id],
+  }),
+}));

@@ -8,6 +8,8 @@ import bcrypt from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db),
+  // NOTE: Si OAuth est ajouté plus tard, il faudra ajouter un callback signIn
+  // pour générer automatiquement un gradient lors de la création d'utilisateurs via OAuth
   providers: [
     CredentialsProvider({
       name: "Credentials",

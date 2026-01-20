@@ -121,11 +121,6 @@ export const cities: City[] = [
     population: 139676,
   },
   {
-    name: "Limoges",
-    color: "bg-gradient-to-br from-rose-500 to-orange-600",
-    population: 128466,
-  },
-  {
     name: "Tours",
     color: "bg-gradient-to-br from-emerald-500 to-lime-600",
     population: 138268,
