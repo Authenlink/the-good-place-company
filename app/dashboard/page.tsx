@@ -350,6 +350,29 @@ export default function DashboardPage() {
             </Card>
           </div>
 
+          {/* Calendar */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendrier de vos événements</CardTitle>
+              <CardDescription>
+                Vos événements à venir auxquels vous êtes inscrit
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <EventCalendarSkeleton />
+              ) : (
+                <EventCalendar
+                  events={calendarEvents}
+                  loading={loading}
+                  title=""
+                  description=""
+                  onEventClick={handleEventClick}
+                />
+              )}
+            </CardContent>
+          </Card>
+
           {/* Chart */}
           <Card className="pt-6">
             <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
@@ -429,29 +452,6 @@ export default function DashboardPage() {
                     <ChartLegend content={<ChartLegendContent />} />
                   </AreaChart>
                 </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Calendar */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Calendrier de vos événements</CardTitle>
-              <CardDescription>
-                Vos événements à venir auxquels vous êtes inscrit
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <EventCalendarSkeleton />
-              ) : (
-                <EventCalendar
-                  events={calendarEvents}
-                  loading={loading}
-                  title=""
-                  description=""
-                  onEventClick={handleEventClick}
-                />
               )}
             </CardContent>
           </Card>

@@ -46,9 +46,12 @@ import {
 } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useScroll } from "@/hooks/use-scroll";
+import { EventSlotSelector } from "@/components/event-slot-selector";
+import { EventRegistrationDialog } from "@/components/event-registration-dialog";
 import {
   EVENT_TYPES,
   RECURRENCE_TYPES,
+  MISSION_TYPES,
   EventType,
   EventStatus,
   ParticipantStatus,
@@ -67,10 +70,12 @@ const eventTypeColors: Record<EventType, string> = {
   collecte_fonds: "bg-pink-500/10 text-pink-600 border-pink-500/20",
   soiree_caritative: "bg-rose-500/10 text-rose-600 border-rose-500/20",
   vente_solidaire: "bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20",
+  marche_solidaire: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
   concert_benefice: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   repas_partage: "bg-amber-500/10 text-amber-600 border-amber-500/20",
   atelier: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
   sensibilisation: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
+  evenement_festif: "bg-pink-500/10 text-pink-600 border-pink-500/20",
   autre: "bg-gray-500/10 text-gray-600 border-gray-500/20",
 };
 
@@ -113,6 +118,26 @@ interface EventDetail {
   participantCount: number;
   waitlistCount: number;
   currentUserStatus: ParticipantStatus | null;
+  slots?: Array<{
+    id: number;
+    startTime: string;
+    endTime: string;
+    maxParticipants: number;
+    missionType?: string;
+    missionDescription?: string | null;
+    missions?: Array<{
+      type: string;
+      description?: string | null;
+      maxParticipants: number;
+      registeredCount?: number;
+      availableSpots?: number;
+    }>;
+    registeredCount: number;
+    prefilledCount: number;
+    totalCount: number;
+    availableSpots: number;
+  }>;
+  hasPlanning?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,6 +154,9 @@ export default function EventDetailPage({
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+  const [selectedMissionType, setSelectedMissionType] = useState<string | null>(null);
+  const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [loadingLikes, setLoadingLikes] = useState(true);
@@ -258,7 +286,22 @@ export default function EventDetailPage({
     }
   };
 
-  const handleRegister = async () => {
+  const handleRegisterClick = () => {
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+
+    // Si l'événement a un planning, ouvrir la popup
+    if (event?.hasPlanning && event.slots && event.slots.length > 0) {
+      setRegistrationDialogOpen(true);
+    } else {
+      // Pas de planning, inscription directe
+      handleRegister(null, null);
+    }
+  };
+
+  const handleRegister = async (slotId: number | null, missionType: string | null) => {
     if (!session) {
       router.push("/login");
       return;
@@ -270,18 +313,49 @@ export default function EventDetailPage({
         `/api/events/${resolvedParams.eventId}/participants`,
         {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            slotId: slotId,
+            missionType: missionType,
+          }),
         }
       );
 
       if (response.ok) {
         const data = await response.json();
+        
+        // Construire le message de confirmation avec créneau et mission
+        const selectedSlot = event?.slots?.find(s => s.id === slotId);
+        let confirmationMessage = "Vous êtes maintenant inscrit à cet événement.";
+        
+        if (selectedSlot) {
+          const slotTime = new Date(selectedSlot.startTime).toLocaleTimeString("fr-FR", { 
+            hour: "2-digit", 
+            minute: "2-digit" 
+          });
+          confirmationMessage = `Inscription confirmée pour le créneau ${slotTime}`;
+          
+          if (missionType && selectedSlot.missions && selectedSlot.missions.length > 0) {
+            const mission = selectedSlot.missions.find((m: { type: string }) => m.type === missionType);
+            if (mission) {
+              const missionName = MISSION_TYPES[missionType as keyof typeof MISSION_TYPES] || missionType;
+              confirmationMessage += ` - Mission : ${missionName}`;
+            }
+          }
+        }
+
         toast({
           title: data.message || "Inscription réussie",
           description:
             data.message === "Vous avez été ajouté à la liste d'attente"
               ? "Vous serez notifié si une place se libère."
-              : "Vous êtes maintenant inscrit à cet événement.",
+              : confirmationMessage,
         });
+        setSelectedSlotId(null);
+        setSelectedMissionType(null);
+        setRegistrationDialogOpen(false);
         fetchEvent();
       } else {
         const errorData = await response.json();
@@ -759,32 +833,32 @@ export default function EventDetailPage({
                       </Button>
                       </div>
                     ) : canRegister ? (
-                      <div className="space-y-3">
-                      {isFull ? (
-                        <>
-                          <p className="text-sm text-muted-foreground">
-                            L&apos;événement est complet. Vous pouvez vous inscrire sur la liste
-                            d&apos;attente.
-                          </p>
+                      <div className="space-y-4">
+                        {isFull ? (
+                          <>
+                            <p className="text-sm text-muted-foreground">
+                              L&apos;événement est complet. Vous pouvez vous inscrire sur la liste
+                              d&apos;attente.
+                            </p>
+                            <Button
+                              className="w-full"
+                              onClick={handleRegisterClick}
+                              disabled={registering}
+                            >
+                              {registering
+                                ? "Traitement..."
+                                : "S'inscrire sur la liste d'attente"}
+                            </Button>
+                          </>
+                        ) : (
                           <Button
                             className="w-full"
-                            onClick={handleRegister}
+                            onClick={handleRegisterClick}
                             disabled={registering}
                           >
-                            {registering
-                              ? "Traitement..."
-                              : "S'inscrire sur la liste d'attente"}
+                            {registering ? "Traitement..." : "S'inscrire"}
                           </Button>
-                        </>
-                      ) : (
-                        <Button
-                          className="w-full"
-                          onClick={handleRegister}
-                          disabled={registering}
-                        >
-                          {registering ? "Traitement..." : "S'inscrire"}
-                        </Button>
-                      )}
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -901,6 +975,18 @@ export default function EventDetailPage({
           </div>
         </div>
       </SidebarInset>
+
+      {/* Dialog d'inscription avec planning */}
+      {event && event.hasPlanning && event.slots && event.slots.length > 0 && (
+        <EventRegistrationDialog
+          open={registrationDialogOpen}
+          onOpenChange={setRegistrationDialogOpen}
+          slots={event.slots}
+          onRegister={handleRegister}
+          isSubmitting={registering}
+          isFull={isFull}
+        />
+      )}
     </SidebarProvider>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import {
   MoreHorizontal,
   Eye,
@@ -278,18 +279,41 @@ export function ProjectCard({
 
         {/* Organisation */}
         <div className="flex items-center gap-2 pt-2 border-t">
-          <Avatar className="h-6 w-6">
-            <AvatarImage
-              src={project.companyLogo || ""}
-              alt={project.companyName || ""}
-            />
-            <AvatarFallback className="text-xs">
-              {project.companyName?.charAt(0).toUpperCase() || "A"}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-sm text-muted-foreground truncate">
-            {project.companyName || "Association"}
-          </span>
+          {project.companyName ? (
+            <Link href={`/associations/${encodeURIComponent(project.companyName)}`}>
+              <Avatar className="h-6 w-6 cursor-pointer hover:opacity-80 transition-opacity">
+                <AvatarImage
+                  src={project.companyLogo || ""}
+                  alt={project.companyName || ""}
+                />
+                <AvatarFallback className="text-xs">
+                  {project.companyName?.charAt(0).toUpperCase() || "A"}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
+          ) : (
+            <Avatar className="h-6 w-6">
+              <AvatarImage
+                src={project.companyLogo || ""}
+                alt={project.companyName || ""}
+              />
+              <AvatarFallback className="text-xs">
+                {project.companyName?.charAt(0).toUpperCase() || "A"}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          {project.companyName ? (
+            <Link 
+              href={`/associations/${encodeURIComponent(project.companyName)}`}
+              className="text-sm text-muted-foreground truncate hover:underline"
+            >
+              {project.companyName || "Association"}
+            </Link>
+          ) : (
+            <span className="text-sm text-muted-foreground truncate">
+              {project.companyName || "Association"}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { DynamicSidebar } from "@/components/dynamic-sidebar";
 import {
   Breadcrumb,
@@ -57,6 +58,7 @@ interface CityCount {
 function MapPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { theme } = useTheme();
   const cityParam = searchParams.get("city");
   const hasScrolled = useScroll();
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -64,6 +66,7 @@ function MapPageContent() {
   const [cityCounts, setCityCounts] = useState<CityCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
 
   useEffect(() => {
     if (cityParam) {
@@ -79,7 +82,7 @@ function MapPageContent() {
       setLoading(true);
       console.log(`🔍 Chargement des entreprises pour: ${city}`);
       const response = await fetch(
-        `/api/companies/city/${encodeURIComponent(city)}`
+        `/api/companies/city/${encodeURIComponent(city)}`,
       );
 
       if (response.ok) {
@@ -105,7 +108,7 @@ function MapPageContent() {
       if (response.ok) {
         const data = await response.json();
         console.log(
-          `📊 Toutes les associations reçues: ${data.companies?.length || 0}`
+          `📊 Toutes les associations reçues: ${data.companies?.length || 0}`,
         );
         setAllCompanies(data.companies || []);
       } else {
@@ -143,7 +146,7 @@ function MapPageContent() {
 
   // Filtrer les associations selon la recherche
   const filteredCompanies = allCompanies.filter((company) =>
-    company.name.toLowerCase().includes(searchQuery.toLowerCase())
+    company.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -264,8 +267,8 @@ function MapPageContent() {
                                 onClick={() =>
                                   router.push(
                                     `/associations/${encodeURIComponent(
-                                      company.name
-                                    )}`
+                                      company.name,
+                                    )}`,
                                   )
                                 }
                               >
@@ -335,8 +338,8 @@ function MapPageContent() {
                                           e.stopPropagation();
                                           router.push(
                                             `/associations/${encodeURIComponent(
-                                              company.name
-                                            )}`
+                                              company.name,
+                                            )}`,
                                           );
                                         }}
                                       >
@@ -350,7 +353,7 @@ function MapPageContent() {
                                 <Separator className="my-2" />
                               )}
                             </div>
-                          )
+                          ),
                         )}
                       </div>
                     </div>
@@ -366,8 +369,8 @@ function MapPageContent() {
                         {cityParam
                           ? `Il n'y a pas encore d'associations enregistrées à ${cityParam}`
                           : searchQuery
-                          ? `Aucune association ne correspond à "${searchQuery}"`
-                          : "Aucune association n'est encore enregistrée"}
+                            ? `Aucune association ne correspond à "${searchQuery}"`
+                            : "Aucune association n'est encore enregistrée"}
                       </p>
                     </div>
                   )}
@@ -396,7 +399,7 @@ function MapPageContent() {
                     <MapVariants
                       companies={companies}
                       cityCounts={cityCounts}
-                      variant="dark"
+                      variant={theme === "dark" ? "dark" : "default"}
                       markerStyle="default"
                       popupStyle="detailed"
                       city={cityParam}

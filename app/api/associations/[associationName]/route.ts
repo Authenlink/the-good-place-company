@@ -23,6 +23,7 @@ export async function GET(
     const association = await db
       .select({
         id: companies.id,
+        userId: companies.userId,
         name: companies.name,
         description: companies.description,
         logo: companies.logo,
@@ -147,25 +148,41 @@ export async function GET(
 
     // Vérifier si l'user connecté suit cette association
     let isFollowing = false;
+    let isOwner = false;
     try {
       const session = await auth();
-      if (session?.user && session.user.accountType === "user") {
+      if (session?.user) {
         const userId = parseInt(session.user.id);
-        const followCheck = await db
-          .select()
-          .from(companyFollowers)
-          .where(
-            and(
-              eq(companyFollowers.companyId, associationData.id),
-              eq(companyFollowers.userId, userId)
+        
+        // Vérifier si l'utilisateur est propriétaire business de l'association
+        if (session.user.accountType === "business") {
+          // Comparer les IDs en s'assurant qu'ils sont du même type
+          const associationUserId = associationData.userId ? Number(associationData.userId) : null;
+          const sessionUserId = Number(session.user.id);
+          
+          if (associationUserId && sessionUserId && associationUserId === sessionUserId) {
+            isOwner = true;
+          }
+        }
+        
+        // Vérifier si l'utilisateur suit cette association
+        if (session.user.accountType === "user") {
+          const followCheck = await db
+            .select()
+            .from(companyFollowers)
+            .where(
+              and(
+                eq(companyFollowers.companyId, associationData.id),
+                eq(companyFollowers.userId, userId)
+              )
             )
-          )
-          .limit(1);
-        isFollowing = followCheck.length > 0;
+            .limit(1);
+          isFollowing = followCheck.length > 0;
+        }
       }
     } catch (error) {
-      // Si erreur d'auth, on continue sans isFollowing
-      console.error("Erreur lors de la vérification du follow:", error);
+      // Si erreur d'auth, on continue sans isFollowing/isOwner
+      console.error("Erreur lors de la vérification du follow/owner:", error);
     }
 
     // Transformer les données pour correspondre au format attendu par le frontend
@@ -196,6 +213,7 @@ export async function GET(
       events: associationEvents,
       projects: associationProjects,
       isFollowing,
+      isOwner,
     };
 
     return NextResponse.json({

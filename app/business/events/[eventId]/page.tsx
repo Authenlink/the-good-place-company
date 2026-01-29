@@ -81,6 +81,7 @@ import {
   ParticipantStatus,
 } from "@/lib/schema";
 import { cn } from "@/lib/utils";
+import { BusinessPlanningCalendar } from "@/components/business-planning-calendar";
 
 // Couleurs par type d'événement
 const eventTypeColors: Record<EventType, string> = {
@@ -96,11 +97,13 @@ const eventTypeColors: Record<EventType, string> = {
   collecte_fonds: "bg-pink-500/10 text-pink-600 border-pink-500/20",
   soiree_caritative: "bg-rose-500/10 text-rose-600 border-rose-500/20",
   vente_solidaire: "bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-500/20",
+  marche_solidaire: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
   concert_benefice: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   // Communauté
   repas_partage: "bg-amber-500/10 text-amber-600 border-amber-500/20",
   atelier: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
   sensibilisation: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20",
+  evenement_festif: "bg-pink-500/10 text-pink-600 border-pink-500/20",
   // Autre
   autre: "bg-gray-500/10 text-gray-600 border-gray-500/20",
 };
@@ -175,6 +178,26 @@ interface EventDetail {
   pendingCount?: number;
   participants: Participant[];
   currentUserStatus: ParticipantStatus | null;
+  slots?: Array<{
+    id: number;
+    startTime: string;
+    endTime: string;
+    maxParticipants: number;
+    missionType?: string;
+    missionDescription?: string | null;
+    missions?: Array<{
+      type: string;
+      description?: string | null;
+      maxParticipants: number;
+      registeredCount?: number;
+      availableSpots?: number;
+    }>;
+    registeredCount: number;
+    prefilledCount: number;
+    totalCount: number;
+    availableSpots: number;
+  }>;
+  hasPlanning?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -196,6 +219,8 @@ export default function EventDetailPage({
     userId: number;
     userName: string | null;
   } | null>(null);
+  const [slots, setSlots] = useState<any[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const hasScrolled = useScroll();
 
   useEffect(() => {
@@ -207,7 +232,31 @@ export default function EventDetailPage({
     }
 
     fetchEvent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, status, router, resolvedParams.eventId]);
+
+  // Charger les slots quand l'événement a un planning
+  useEffect(() => {
+    if (event?.hasPlanning) {
+      fetchSlots();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.hasPlanning]);
+
+  const fetchSlots = async () => {
+    setLoadingSlots(true);
+    try {
+      const response = await fetch(`/api/events/${resolvedParams.eventId}/slots`);
+      if (response.ok) {
+        const data = await response.json();
+        setSlots(data);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des slots:", error);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
 
   const fetchEvent = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -225,6 +274,20 @@ export default function EventDetailPage({
           variant: "destructive",
         });
         router.push("/business/events");
+      } else if (response.status === 401) {
+        toast({
+          title: "Non autorisé",
+          description: "Vous devez être connecté pour voir cet événement.",
+          variant: "destructive",
+        });
+        router.push("/login");
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Erreur inconnue" }));
+        toast({
+          title: "Erreur",
+          description: errorData.error || "Impossible de charger l'événement.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Erreur lors du chargement de l'événement:", error);
@@ -1039,6 +1102,35 @@ export default function EventDetailPage({
                   </Tabs>
                 </CardContent>
               </Card>
+
+              {/* Planning */}
+              {event.hasPlanning && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Planning</CardTitle>
+                    <CardDescription>
+                      Vue d&apos;ensemble des créneaux et des participants inscrits
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingSlots ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : slots.length > 0 ? (
+                      <BusinessPlanningCalendar
+                        slots={slots}
+                        eventStartDate={startDate}
+                        eventEndDate={endDate || startDate}
+                      />
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">
+                        Aucun créneau configuré pour cet événement.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Colonne latérale */}

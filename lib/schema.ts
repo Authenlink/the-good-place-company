@@ -161,10 +161,12 @@ export const EVENT_TYPES = {
   collecte_fonds: "Collecte de fonds",
   soiree_caritative: "Soirée caritative",
   vente_solidaire: "Vente solidaire",
+  marche_solidaire: "Marché solidaire",
   concert_benefice: "Concert bénéfice",
   repas_partage: "Repas partagé",
   atelier: "Atelier / Formation",
   sensibilisation: "Sensibilisation",
+  evenement_festif: "Événement festif",
   benevolat: "Mission bénévolat",
   autre: "Autre",
 } as const;
@@ -190,12 +192,13 @@ export const EVENT_CATEGORIES = {
       "collecte_fonds",
       "soiree_caritative",
       "vente_solidaire",
+      "marche_solidaire",
       "concert_benefice",
     ],
   },
   communaute: {
     label: "Communauté",
-    types: ["repas_partage", "atelier", "sensibilisation"],
+    types: ["repas_partage", "atelier", "sensibilisation", "evenement_festif"],
   },
   autre: {
     label: "Autre",
@@ -232,6 +235,21 @@ export const PARTICIPANT_STATUSES = {
 } as const;
 
 export type ParticipantStatus = keyof typeof PARTICIPANT_STATUSES;
+
+// Types de missions pour les créneaux
+export const MISSION_TYPES = {
+  accueil: "Accueil",
+  distribution: "Distribution",
+  logistique: "Logistique",
+  animation: "Animation",
+  buvette: "Buvette",
+  installation: "Installation",
+  communication: "Communication",
+  securite: "Sécurité",
+  autre: "Autre",
+} as const;
+
+export type MissionType = keyof typeof MISSION_TYPES;
 
 // ==================== PROJETS ====================
 
@@ -321,7 +339,10 @@ export const events = pgTable("events", {
   maxParticipants: integer("max_participants"),
   recurrence: text("recurrence").$type<RecurrenceType>().default("none"),
   recurrenceEndDate: timestamp("recurrence_end_date"),
-  recurrenceGroupId: integer("recurrence_group_id").references((): any => events.id, { onDelete: "cascade" }), // ID du premier événement de la série (null pour événements uniques ou premier événement)
+  recurrenceGroupId: integer("recurrence_group_id").references(
+    (): any => events.id,
+    { onDelete: "cascade" },
+  ), // ID du premier événement de la série (null pour événements uniques ou premier événement)
   // Champs pour événements payants / collecte de fonds
   isPaid: boolean("is_paid").default(false),
   price: numeric("price", { precision: 10, scale: 2 }),
@@ -355,6 +376,47 @@ export const eventParticipants = pgTable("event_participants", {
     .$type<ParticipantStatus>()
     .notNull()
     .default("confirmed"),
+  slotId: integer("slot_id").references((): any => eventSlots.id, {
+    onDelete: "set null",
+  }), // Créneau choisi (nullable pour compatibilité avec événements sans planning)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Table event_slots pour les créneaux horaires des événements
+export const eventSlots = pgTable("event_slots", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id")
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  maxParticipants: integer("max_participants").notNull(),
+  missions: jsonb("missions").$type<Array<{
+    type: MissionType;
+    description?: string;
+    maxParticipants: number;
+  }>>().notNull().default([]), // Tableau de missions pour ce créneau
+  // Champs dépréciés pour compatibilité (seront supprimés dans une future migration)
+  missionType: text("mission_type").$type<MissionType>(),
+  missionDescription: text("mission_description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Table event_slot_participants pour les participants aux créneaux (inscrits et pré-remplis)
+export const eventSlotParticipants = pgTable("event_slot_participants", {
+  id: serial("id").primaryKey(),
+  slotId: integer("slot_id")
+    .notNull()
+    .references(() => eventSlots.id, { onDelete: "cascade" }),
+  participantId: integer("participant_id").references(
+    () => eventParticipants.id,
+    {
+      onDelete: "cascade",
+    },
+  ), // Si utilisateur inscrit sur l'app
+  prefilledName: text("prefilled_name"), // Nom si membre non-inscrit sur l'app
+  missionType: text("mission_type").$type<MissionType>(), // Mission choisie pour ce créneau
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -382,14 +444,42 @@ export const userFollows = pgTable("user_follows", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Types de membres
+export const MEMBER_TYPES = {
+  volunteer: "Bénévole",
+  permanent_member: "Membre permanent",
+} as const;
+
+export type MemberType = keyof typeof MEMBER_TYPES;
+
+// Table user_company_memberships pour les associations auxquelles un utilisateur appartient
+export const userCompanyMemberships = pgTable("user_company_memberships", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id")
+    .notNull()
+    .references(() => companies.id, { onDelete: "cascade" }),
+  memberType: text("member_type")
+    .notNull()
+    .default("volunteer")
+    .$type<MemberType>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Table post_likes pour les likes sur les posts
 export const postLikes = pgTable("post_likes", {
   id: serial("id").primaryKey(),
   postId: integer("post_id")
     .notNull()
     .references(() => posts.id, { onDelete: "cascade" }),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  companyId: integer("company_id").references(() => companies.id, {
+    onDelete: "cascade",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -399,8 +489,12 @@ export const eventLikes = pgTable("event_likes", {
   eventId: integer("event_id")
     .notNull()
     .references(() => events.id, { onDelete: "cascade" }),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  companyId: integer("company_id").references(() => companies.id, {
+    onDelete: "cascade",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -411,9 +505,15 @@ export const eventComments = pgTable("event_comments", {
   eventId: integer("event_id")
     .notNull()
     .references(() => events.id, { onDelete: "cascade" }),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
-  parentId: integer("parent_id").references((): any => eventComments.id, { onDelete: "cascade" }), // Pour les réponses aux commentaires
+  userId: integer("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  companyId: integer("company_id").references(() => companies.id, {
+    onDelete: "cascade",
+  }),
+  parentId: integer("parent_id").references((): any => eventComments.id, {
+    onDelete: "cascade",
+  }), // Pour les réponses aux commentaires
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -424,8 +524,12 @@ export const commentLikes = pgTable("comment_likes", {
   commentId: integer("comment_id")
     .notNull()
     .references(() => comments.id, { onDelete: "cascade" }),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  companyId: integer("company_id").references(() => companies.id, {
+    onDelete: "cascade",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -435,8 +539,12 @@ export const eventCommentLikes = pgTable("event_comment_likes", {
   eventCommentId: integer("event_comment_id")
     .notNull()
     .references(() => eventComments.id, { onDelete: "cascade" }),
-  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  companyId: integer("company_id").references(() => companies.id, {
+    onDelete: "cascade",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -449,6 +557,7 @@ export const NOTIFICATION_TYPES = {
   event_liked: "event_liked",
   post_commented: "post_commented",
   event_commented: "event_commented",
+  member_joined: "member_joined",
   // Pour les utilisateurs
   user_followed: "user_followed",
   comment_liked: "comment_liked",
@@ -467,13 +576,31 @@ export const notifications = pgTable("notifications", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull().$type<NotificationType>(),
-  relatedUserId: integer("related_user_id").references(() => users.id, { onDelete: "set null" }),
-  relatedCompanyId: integer("related_company_id").references(() => companies.id, { onDelete: "set null" }),
-  relatedPostId: integer("related_post_id").references(() => posts.id, { onDelete: "cascade" }),
-  relatedEventId: integer("related_event_id").references(() => events.id, { onDelete: "cascade" }),
-  relatedCommentId: integer("related_comment_id").references(() => comments.id, { onDelete: "cascade" }),
-  relatedEventCommentId: integer("related_event_comment_id").references(() => eventComments.id, { onDelete: "cascade" }),
-  relatedParticipantId: integer("related_participant_id").references(() => eventParticipants.id, { onDelete: "cascade" }),
+  relatedUserId: integer("related_user_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  relatedCompanyId: integer("related_company_id").references(
+    () => companies.id,
+    { onDelete: "set null" },
+  ),
+  relatedPostId: integer("related_post_id").references(() => posts.id, {
+    onDelete: "cascade",
+  }),
+  relatedEventId: integer("related_event_id").references(() => events.id, {
+    onDelete: "cascade",
+  }),
+  relatedCommentId: integer("related_comment_id").references(
+    () => comments.id,
+    { onDelete: "cascade" },
+  ),
+  relatedEventCommentId: integer("related_event_comment_id").references(
+    () => eventComments.id,
+    { onDelete: "cascade" },
+  ),
+  relatedParticipantId: integer("related_participant_id").references(
+    () => eventParticipants.id,
+    { onDelete: "cascade" },
+  ),
   message: text("message").notNull(),
   read: boolean("read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -487,6 +614,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   posts: many(posts),
   comments: many(comments),
   eventParticipations: many(eventParticipants),
+  eventSlotParticipants: many(eventSlotParticipants),
   companyFollows: many(companyFollowers),
   following: many(userFollows, {
     relationName: "follower",
@@ -494,6 +622,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   followers: many(userFollows, {
     relationName: "following",
   }),
+  companyMemberships: many(userCompanyMemberships),
   postLikes: many(postLikes),
   eventLikes: many(eventLikes),
   eventComments: many(eventComments),
@@ -516,6 +645,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
   events: many(events),
   projects: many(projects),
   followers: many(companyFollowers),
+  memberships: many(userCompanyMemberships),
   postLikes: many(postLikes),
   eventLikes: many(eventLikes),
   eventComments: many(eventComments),
@@ -536,6 +666,7 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
     references: [companies.id],
   }),
   participants: many(eventParticipants),
+  slots: many(eventSlots),
   likes: many(eventLikes),
   comments: many(eventComments),
 }));
@@ -551,7 +682,33 @@ export const eventParticipantsRelations = relations(
       fields: [eventParticipants.userId],
       references: [users.id],
     }),
-  })
+    slot: one(eventSlots, {
+      fields: [eventParticipants.slotId],
+      references: [eventSlots.id],
+    }),
+  }),
+);
+
+export const eventSlotsRelations = relations(eventSlots, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventSlots.eventId],
+    references: [events.id],
+  }),
+  slotParticipants: many(eventSlotParticipants),
+}));
+
+export const eventSlotParticipantsRelations = relations(
+  eventSlotParticipants,
+  ({ one }) => ({
+    slot: one(eventSlots, {
+      fields: [eventSlotParticipants.slotId],
+      references: [eventSlots.id],
+    }),
+    participant: one(eventParticipants, {
+      fields: [eventSlotParticipants.participantId],
+      references: [eventParticipants.id],
+    }),
+  }),
 );
 
 export const postsRelations = relations(posts, ({ one, many }) => ({
@@ -613,23 +770,34 @@ export const companyFollowersRelations = relations(
       fields: [companyFollowers.userId],
       references: [users.id],
     }),
-  })
+  }),
 );
 
-export const userFollowsRelations = relations(
-  userFollows,
+export const userFollowsRelations = relations(userFollows, ({ one }) => ({
+  follower: one(users, {
+    fields: [userFollows.followerId],
+    references: [users.id],
+    relationName: "follower",
+  }),
+  following: one(users, {
+    fields: [userFollows.followingId],
+    references: [users.id],
+    relationName: "following",
+  }),
+}));
+
+export const userCompanyMembershipsRelations = relations(
+  userCompanyMemberships,
   ({ one }) => ({
-    follower: one(users, {
-      fields: [userFollows.followerId],
+    user: one(users, {
+      fields: [userCompanyMemberships.userId],
       references: [users.id],
-      relationName: "follower",
     }),
-    following: one(users, {
-      fields: [userFollows.followingId],
-      references: [users.id],
-      relationName: "following",
+    company: one(companies, {
+      fields: [userCompanyMemberships.companyId],
+      references: [companies.id],
     }),
-  })
+  }),
 );
 
 export const postLikesRelations = relations(postLikes, ({ one }) => ({
@@ -662,26 +830,29 @@ export const eventLikesRelations = relations(eventLikes, ({ one }) => ({
   }),
 }));
 
-export const eventCommentsRelations = relations(eventComments, ({ one, many }) => ({
-  event: one(events, {
-    fields: [eventComments.eventId],
-    references: [events.id],
+export const eventCommentsRelations = relations(
+  eventComments,
+  ({ one, many }) => ({
+    event: one(events, {
+      fields: [eventComments.eventId],
+      references: [events.id],
+    }),
+    user: one(users, {
+      fields: [eventComments.userId],
+      references: [users.id],
+    }),
+    company: one(companies, {
+      fields: [eventComments.companyId],
+      references: [companies.id],
+    }),
+    parent: one(eventComments, {
+      fields: [eventComments.parentId],
+      references: [eventComments.id],
+    }),
+    replies: many(eventComments),
+    likes: many(eventCommentLikes),
   }),
-  user: one(users, {
-    fields: [eventComments.userId],
-    references: [users.id],
-  }),
-  company: one(companies, {
-    fields: [eventComments.companyId],
-    references: [companies.id],
-  }),
-  parent: one(eventComments, {
-    fields: [eventComments.parentId],
-    references: [eventComments.id],
-  }),
-  replies: many(eventComments),
-  likes: many(eventCommentLikes),
-}));
+);
 
 export const commentLikesRelations = relations(commentLikes, ({ one }) => ({
   comment: one(comments, {
@@ -698,20 +869,23 @@ export const commentLikesRelations = relations(commentLikes, ({ one }) => ({
   }),
 }));
 
-export const eventCommentLikesRelations = relations(eventCommentLikes, ({ one }) => ({
-  eventComment: one(eventComments, {
-    fields: [eventCommentLikes.eventCommentId],
-    references: [eventComments.id],
+export const eventCommentLikesRelations = relations(
+  eventCommentLikes,
+  ({ one }) => ({
+    eventComment: one(eventComments, {
+      fields: [eventCommentLikes.eventCommentId],
+      references: [eventComments.id],
+    }),
+    user: one(users, {
+      fields: [eventCommentLikes.userId],
+      references: [users.id],
+    }),
+    company: one(companies, {
+      fields: [eventCommentLikes.companyId],
+      references: [companies.id],
+    }),
   }),
-  user: one(users, {
-    fields: [eventCommentLikes.userId],
-    references: [users.id],
-  }),
-  company: one(companies, {
-    fields: [eventCommentLikes.companyId],
-    references: [companies.id],
-  }),
-}));
+);
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, {

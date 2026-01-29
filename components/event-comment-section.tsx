@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, memo } from "react";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { MessageCircle, Send, Heart } from "lucide-react";
@@ -68,6 +69,7 @@ export function EventCommentSection({ eventId, onCommentAdded }: EventCommentSec
   const [likesList, setLikesList] = useState<LikeUser[]>([]);
   const [loadingLikes, setLoadingLikes] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const fetchComments = useCallback(async () => {
     try {
@@ -286,6 +288,7 @@ export function EventCommentSection({ eventId, onCommentAdded }: EventCommentSec
     }
   };
 
+
   if (loading) {
     return (
       <div className="text-sm text-muted-foreground py-4">
@@ -329,9 +332,20 @@ export function EventCommentSection({ eventId, onCommentAdded }: EventCommentSec
     const currentReplyContent = replyContent[comment.id] || "";
     const isSubmitting = submittingReply[comment.id] || false;
 
+    const onProfileClick = useCallback(() => {
+      if (comment.userId) {
+        router.push(`/user/${comment.userId}`);
+      } else if (comment.companyId && comment.companyName) {
+        router.push(`/company/${encodeURIComponent(comment.companyName)}`);
+      }
+    }, [comment.userId, comment.companyId, comment.companyName]);
+
     return (
       <div className={`flex gap-3 ${isReply ? "ml-8 mt-3" : ""}`}>
-        <Avatar className={`flex-shrink-0 ${isReply ? "h-7 w-7" : "h-9 w-9"} border border-border rounded-full`}>
+        <Avatar
+          className={`flex-shrink-0 ${isReply ? "h-7 w-7" : "h-9 w-9"} border border-border rounded-full cursor-pointer hover:opacity-80 transition-opacity`}
+          onClick={onProfileClick}
+        >
           <AvatarImage src={displayImage || ""} alt={displayName} />
           <AvatarFallback
             className={`${isReply ? "text-xs" : "text-sm"} text-white font-semibold`}
@@ -348,7 +362,10 @@ export function EventCommentSection({ eventId, onCommentAdded }: EventCommentSec
           <div className="bg-background border border-border rounded-lg p-3 hover:border-border/80 transition-colors">
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-sm text-foreground">
+                <span
+                  className="font-semibold text-sm text-foreground cursor-pointer hover:text-primary transition-colors"
+                  onClick={onProfileClick}
+                >
                   {displayName}
                 </span>
                 <span className="text-xs text-muted-foreground">

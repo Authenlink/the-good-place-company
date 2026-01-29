@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { events, companies, eventParticipants } from "@/lib/schema";
+import { events, companies, eventParticipants, eventSlots } from "@/lib/schema";
 import { eq, desc, and, gte, lt, sql, ilike } from "drizzle-orm";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { RecurrenceType } from "@/lib/schema";
@@ -269,6 +269,7 @@ export async function POST(request: NextRequest) {
       contactPhone,
       externalLink,
       status,
+      planning, // Nouveau champ pour le planning
     } = body;
 
     // Validation
@@ -438,7 +439,14 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json(firstEvent[0], { status: 201 });
+      const createdEvent = firstEvent[0];
+
+      // Créer les slots si le planning est activé
+      if (planning?.enabled && planning?.slots && planning.slots.length > 0) {
+        await createEventSlots(createdEvent.id, planning.slots, startDateTime, endDateTime || startDateTime);
+      }
+
+      return NextResponse.json(createdEvent, { status: 201 });
     }
 
     // Créer un événement unique (pas de récurrence)
@@ -479,12 +487,90 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    return NextResponse.json(newEvent[0], { status: 201 });
+    const createdEvent = newEvent[0];
+
+    // Créer les slots si le planning est activé
+    if (planning?.enabled && planning?.slots && planning.slots.length > 0) {
+      await createEventSlots(createdEvent.id, planning.slots, startDateTime, endDateTime || startDateTime);
+    }
+
+    return NextResponse.json(createdEvent, { status: 201 });
   } catch (error) {
     console.error("Erreur lors de la création de l'événement:", error);
     return NextResponse.json(
       { error: "Erreur interne du serveur" },
       { status: 500 }
     );
+  }
+}
+
+// Fonction helper pour créer les slots d'un événement
+async function createEventSlots(
+  eventId: number,
+  slots: Array<{
+    startTime: string;
+    endTime: string;
+    maxParticipants: number;
+    missions?: Array<{
+      type: string;
+      description?: string;
+      maxParticipants: number;
+    }>;
+    // Champs dépréciés pour compatibilité
+    missionType?: string;
+    missionDescription?: string;
+  }>,
+  eventStartDate: Date,
+  eventEndDate: Date
+) {
+  for (const slot of slots) {
+    const startTime = new Date(slot.startTime);
+    const endTime = new Date(slot.endTime);
+
+    // Vérifier que le créneau est dans les dates de l'événement
+    if (startTime < eventStartDate || endTime > eventEndDate) {
+      console.warn(`Slot ignoré car hors des dates de l'événement: ${slot.startTime} - ${slot.endTime}`);
+      continue;
+    }
+
+    // Vérifier qu'il n'y a pas de chevauchement
+    const existingSlots = await db
+      .select()
+      .from(eventSlots)
+      .where(eq(eventSlots.eventId, eventId));
+
+    const hasOverlap = existingSlots.some((existingSlot) => {
+      const existingStart = new Date(existingSlot.startTime);
+      const existingEnd = new Date(existingSlot.endTime);
+      return startTime < existingEnd && endTime > existingStart;
+    });
+
+    if (hasOverlap) {
+      console.warn(`Slot ignoré car chevauchement: ${slot.startTime} - ${slot.endTime}`);
+      continue;
+    }
+
+    // Normaliser les missions : utiliser le nouveau format si disponible, sinon convertir l'ancien
+    const missions = slot.missions || (slot.missionType ? [{
+      type: slot.missionType,
+      description: slot.missionDescription,
+      maxParticipants: slot.maxParticipants || 10,
+    }] : [{
+      type: "autre",
+      description: "",
+      maxParticipants: slot.maxParticipants || 10,
+    }]);
+
+    // Créer le slot
+    await db.insert(eventSlots).values({
+      eventId: eventId as any,
+      startTime,
+      endTime,
+      maxParticipants: slot.maxParticipants,
+      missions: missions,
+      // Garder les anciens champs pour compatibilité (seront supprimés plus tard)
+      missionType: missions[0]?.type || null,
+      missionDescription: missions[0]?.description || null,
+    } as any);
   }
 }

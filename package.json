@@ -20,7 +20,14 @@
     "db:apply-likes-comments": "tsx scripts/apply-likes-and-event-comments-migration.ts",
     "db:apply-comment-likes": "tsx scripts/apply-comment-likes-migration.ts",
     "db:apply-user-follows": "tsx scripts/apply-user-follows-migration.ts",
-    "db:apply-notifications": "tsx scripts/apply-notifications-migration.ts"
+    "db:apply-notifications": "tsx scripts/apply-notifications-migration.ts",
+    "db:apply-user-company-memberships": "tsx scripts/apply-user-company-memberships-migration.ts",
+    "db:apply-member-type": "tsx scripts/apply-member-type-migration.ts",
+    "db:apply-event-planning": "tsx scripts/apply-event-planning-migration.ts",
+    "db:create-planning-indexes": "tsx scripts/create-event-planning-indexes.ts",
+    "db:apply-missions": "tsx scripts/apply-missions-migration.ts",
+    "db:apply-mission-type": "tsx scripts/apply-mission-type-migration.ts",
+    "db:apply-all-missions": "node scripts/apply-migrations-now.js"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",

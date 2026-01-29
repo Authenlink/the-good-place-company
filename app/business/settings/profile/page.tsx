@@ -64,7 +64,7 @@ import {
   Save,
   X,
   Trash2,
-  Upload
+  Upload,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -207,7 +207,10 @@ export default function CompanyProfilePage() {
           // Garder les valeurs par défaut (0)
         }
       } catch (error) {
-        console.error("Erreur réseau lors du chargement des statistiques:", error);
+        console.error(
+          "Erreur réseau lors du chargement des statistiques:",
+          error,
+        );
         // Garder les valeurs par défaut (0)
       } finally {
         setIsLoading(false);
@@ -397,7 +400,7 @@ export default function CompanyProfilePage() {
 
   const selectedArea = areas.find((area) => area.id === formData.areaId);
   const selectedValues = availableValues.filter((value) =>
-    formData.values.includes(value.id)
+    formData.values.includes(value.id),
   );
 
   return (
@@ -452,24 +455,25 @@ export default function CompanyProfilePage() {
           <Card className="overflow-hidden p-0">
             {/* Background Image or Gradient */}
             <div className="relative h-32 w-full">
-                {formData.backgroundType === "gradient" && formData.backgroundGradient ? (
-                  <div
-                    className="w-full h-full"
-                    style={{
-                      background: formData.backgroundGradient.css,
-                    }}
-                  />
-                ) : formData.background ? (
-                  <Image
-                    src={formData.background}
-                    alt="Background"
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
-                )}
-              </div>
+              {formData.backgroundType === "gradient" &&
+              formData.backgroundGradient ? (
+                <div
+                  className="w-full h-full"
+                  style={{
+                    background: formData.backgroundGradient.css,
+                  }}
+                />
+              ) : formData.background ? (
+                <Image
+                  src={formData.background}
+                  alt="Background"
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
+              )}
+            </div>
 
             <CardHeader className="pb-0">
               {/* Logo and Basic Info */}
@@ -599,7 +603,7 @@ export default function CompanyProfilePage() {
                         <div className="flex flex-wrap gap-2 mt-2">
                           {availableValues.map((value) => {
                             const isSelected = formData.values.includes(
-                              value.id
+                              value.id,
                             );
                             return (
                               <Button
@@ -611,7 +615,7 @@ export default function CompanyProfilePage() {
                                     setFormData({
                                       ...formData,
                                       values: formData.values.filter(
-                                        (id) => id !== value.id
+                                        (id) => id !== value.id,
                                       ),
                                     });
                                   } else if (formData.values.length < 3) {
@@ -679,10 +683,7 @@ export default function CompanyProfilePage() {
           {isEditing && (
             <Card>
               <CardHeader>
-                <CardTitle>Personnalisation du background</CardTitle>
-                <CardDescription>
-                  Choisissez une image ou un gradient pour votre bannière
-                </CardDescription>
+                <CardTitle>Background</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -707,7 +708,10 @@ export default function CompanyProfilePage() {
                         setFormData({
                           ...formData,
                           background: "",
-                          backgroundType: formData.backgroundType === "image" ? null : formData.backgroundType,
+                          backgroundType:
+                            formData.backgroundType === "image"
+                              ? null
+                              : formData.backgroundType,
                         });
                       }}
                     >
@@ -888,7 +892,10 @@ export default function CompanyProfilePage() {
                         type="url"
                         value={formData.instagramUrl || ""}
                         onChange={(e) =>
-                          setFormData({ ...formData, instagramUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            instagramUrl: e.target.value,
+                          })
                         }
                         placeholder="https://instagram.com/votrecompte"
                       />
@@ -902,7 +909,10 @@ export default function CompanyProfilePage() {
                         type="url"
                         value={formData.tiktokUrl || ""}
                         onChange={(e) =>
-                          setFormData({ ...formData, tiktokUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            tiktokUrl: e.target.value,
+                          })
                         }
                         placeholder="https://tiktok.com/@votrecompte"
                       />
@@ -916,7 +926,10 @@ export default function CompanyProfilePage() {
                         type="url"
                         value={formData.linkedinUrl || ""}
                         onChange={(e) =>
-                          setFormData({ ...formData, linkedinUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            linkedinUrl: e.target.value,
+                          })
                         }
                         placeholder="https://linkedin.com/company/votreentreprise"
                       />
@@ -951,7 +964,9 @@ export default function CompanyProfilePage() {
                         </div>
                       </div>
                     )}
-                    {(companyData.instagramUrl || companyData.tiktokUrl || companyData.linkedinUrl) && (
+                    {(companyData.instagramUrl ||
+                      companyData.tiktokUrl ||
+                      companyData.linkedinUrl) && (
                       <div className="flex items-center gap-4 pt-2">
                         {companyData.instagramUrl && (
                           <a
@@ -1005,13 +1020,17 @@ export default function CompanyProfilePage() {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{companyStats.activeEvents}</div>
+                  <div className="text-2xl font-bold">
+                    {companyStats.activeEvents}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Événements actifs
                   </p>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{companyStats.followers}</div>
+                  <div className="text-2xl font-bold">
+                    {companyStats.followers}
+                  </div>
                   <p className="text-sm text-muted-foreground">Abonnés</p>
                 </div>
               </div>
@@ -1020,50 +1039,54 @@ export default function CompanyProfilePage() {
 
           {/* Action Buttons */}
           {isEditing && (
-            <div className="flex justify-between items-center">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="destructive" disabled={isDeleting}>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer l&apos;entreprise
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Êtes-vous sûr ?</DialogTitle>
-                    <DialogDescription>
-                      Cette action est irr&eacute;versible. Toutes les
-                      donn&eacute;es de votre entreprise,
-                      &eacute;v&eacute;nements, projets et abonn&eacute;s seront
-                      supprim&eacute;s d&eacute;finitivement.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => {}}>
-                      Annuler
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting
-                        ? "Suppression..."
-                        : "Supprimer définitivement"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleCancel}>
-                  <X className="h-4 w-4 mr-2" />
-                  Annuler
-                </Button>
-                <Button onClick={handleSave}>
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center">
+              {/* Boutons principaux - responsive */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-2 order-2 sm:order-1">
+                <Button onClick={handleSave} className="w-full sm:w-auto">
                   <Save className="h-4 w-4 mr-2" />
                   Sauvegarder
                 </Button>
+                <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
+                  <X className="h-4 w-4 mr-2" />
+                  Annuler
+                </Button>
+              </div>
+
+              {/* Bouton supprimer - en bas sur mobile */}
+              <div className="order-3 sm:order-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive" disabled={isDeleting} className="w-full sm:w-auto">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer l&apos;entreprise
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Êtes-vous sûr ?</DialogTitle>
+                      <DialogDescription>
+                        Cette action est irr&eacute;versible. Toutes les
+                        donn&eacute;es de votre entreprise,
+                        &eacute;v&eacute;nements, projets et abonn&eacute;s seront
+                        supprim&eacute;s d&eacute;finitivement.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => {}}>
+                        Annuler
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting
+                          ? "Suppression..."
+                          : "Supprimer définitivement"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           )}

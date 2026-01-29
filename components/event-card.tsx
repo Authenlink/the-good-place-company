@@ -320,18 +320,41 @@ export function EventCard({
         {/* Header avec avatar et nom - après l'image */}
         <div className="flex items-center justify-between p-3">
           <div className="flex items-center space-x-2">
-            <Avatar className="h-7 w-7">
-              <AvatarImage
-                src={event.companyLogo || undefined}
-                alt={event.companyName || "Entreprise"}
-              />
-              <AvatarFallback className="text-xs">
-                {(event.companyName || "E").charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <p className="text-xs font-semibold text-foreground">
-              {event.companyName || "Entreprise"}
-            </p>
+            {event.companyName && event.companyId ? (
+              <Link href={`/associations/${encodeURIComponent(event.companyName)}`}>
+                <Avatar className="h-7 w-7 cursor-pointer hover:opacity-80 transition-opacity">
+                  <AvatarImage
+                    src={event.companyLogo || undefined}
+                    alt={event.companyName || "Entreprise"}
+                  />
+                  <AvatarFallback className="text-xs">
+                    {(event.companyName || "E").charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+            ) : (
+              <Avatar className="h-7 w-7">
+                <AvatarImage
+                  src={event.companyLogo || undefined}
+                  alt={event.companyName || "Entreprise"}
+                />
+                <AvatarFallback className="text-xs">
+                  {(event.companyName || "E").charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            )}
+            {event.companyName && event.companyId ? (
+              <Link 
+                href={`/associations/${encodeURIComponent(event.companyName)}`}
+                className="text-xs font-semibold text-foreground hover:underline"
+              >
+                {event.companyName || "Entreprise"}
+              </Link>
+            ) : (
+              <p className="text-xs font-semibold text-foreground">
+                {event.companyName || "Entreprise"}
+              </p>
+            )}
           </div>
           {event.companyId && (
             <DropdownMenu>

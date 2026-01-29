@@ -31,11 +31,11 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Calendar,
-  FolderKanban,
   Users,
   MessageSquare,
   Plus,
   ArrowRight,
+  UserCheck,
 } from "lucide-react";
 import { EventType } from "@/lib/schema";
 import {
@@ -71,7 +71,7 @@ export default function BusinessDashboardPage() {
 
   const [events, setEvents] = useState<Event[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [projectsCount, setProjectsCount] = useState(0);
+  const [membersCount, setMembersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const hasScrolled = useScroll();
 
@@ -113,13 +113,11 @@ export default function BusinessDashboardPage() {
         setPosts(postsData);
       }
 
-      // Fetch projects count
-      const projectsResponse = await fetch(
-        "/api/projects?companyOnly=true&status=active"
-      );
-      if (projectsResponse.ok) {
-        const projectsData = await projectsResponse.json();
-        setProjectsCount(projectsData.length);
+      // Fetch members count
+      const membersResponse = await fetch("/api/company/members");
+      if (membersResponse.ok) {
+        const membersData = await membersResponse.json();
+        setMembersCount(membersData.members?.length || 0);
       }
     } catch (error) {
       console.error("Erreur lors du chargement des données:", error);
@@ -183,11 +181,11 @@ export default function BusinessDashboardPage() {
 
   // Calculer les stats
   const upcomingEvents = events.filter(
-    (e) => new Date(e.startDate) >= new Date() && e.status === "published"
+    (e) => new Date(e.startDate) >= new Date() && e.status === "published",
   );
   const totalParticipants = events.reduce(
     (acc, e) => acc + (e.participantCount || 0),
-    0
+    0,
   );
 
   return (
@@ -249,23 +247,21 @@ export default function BusinessDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* 2. Projets */}
+            {/* 2. Membres */}
             <Card
               className="cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => router.push("/business/projects")}
+              onClick={() => router.push("/business/members")}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Projets actifs
-                </CardTitle>
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Membres</CardTitle>
+                <UserCheck className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-12" /> : projectsCount}
+                  {loading ? <Skeleton className="h-8 w-12" /> : membersCount}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Projets en cours
+                  Membres de l&apos;association
                 </p>
               </CardContent>
             </Card>

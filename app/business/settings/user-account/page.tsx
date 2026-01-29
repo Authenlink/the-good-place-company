@@ -47,7 +47,20 @@ import { useScroll } from "@/hooks/use-scroll";
 import { UploadButton } from "@/components/ui/upload-button";
 import { BackgroundSelector } from "@/components/background-selector";
 import type { Gradient } from "@/lib/gradient-generator";
-import { User, Mail, Lock, Trash2, Save, Eye, EyeOff, Edit, MapPin, Globe, Upload, X } from "lucide-react";
+import {
+  User,
+  Mail,
+  Lock,
+  Trash2,
+  Save,
+  Eye,
+  EyeOff,
+  Edit,
+  MapPin,
+  Globe,
+  Upload,
+  X,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 // Composants d'icônes pour les réseaux sociaux
@@ -83,7 +96,6 @@ const LinkedInIcon = ({ className }: { className?: string }) => (
     <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
   </svg>
 );
-
 
 export default function UserAccountPage() {
   const { data: session, status } = useSession();
@@ -339,7 +351,7 @@ export default function UserAccountPage() {
 
       if (!response.ok) {
         throw new Error(
-          result.error || "Erreur lors de la modification du mot de passe"
+          result.error || "Erreur lors de la modification du mot de passe",
         );
       }
 
@@ -381,7 +393,7 @@ export default function UserAccountPage() {
 
       if (!response.ok) {
         throw new Error(
-          result.error || "Erreur lors de la suppression du compte"
+          result.error || "Erreur lors de la suppression du compte",
         );
       }
 
@@ -463,7 +475,8 @@ export default function UserAccountPage() {
           <Card className="overflow-hidden p-0">
             {/* Background Image or Gradient */}
             <div className="relative h-32 w-full">
-              {formData.backgroundType === "gradient" && formData.backgroundGradient ? (
+              {formData.backgroundType === "gradient" &&
+              formData.backgroundGradient ? (
                 <div
                   className="w-full h-full"
                   style={{
@@ -581,7 +594,7 @@ export default function UserAccountPage() {
                             {
                               year: "numeric",
                               month: "long",
-                            }
+                            },
                           )}
                         </p>
                       </div>
@@ -596,7 +609,7 @@ export default function UserAccountPage() {
           {isEditing && (
             <Card>
               <CardHeader>
-                <CardTitle>Personnalisation du background</CardTitle>
+                <CardTitle>Background</CardTitle>
                 <CardDescription>
                   Choisissez une image ou un gradient pour votre bannière
                 </CardDescription>
@@ -624,7 +637,10 @@ export default function UserAccountPage() {
                         setFormData({
                           ...formData,
                           banner: "",
-                          backgroundType: formData.backgroundType === "image" ? null : formData.backgroundType,
+                          backgroundType:
+                            formData.backgroundType === "image"
+                              ? null
+                              : formData.backgroundType,
                         });
                       }}
                     >
@@ -661,14 +677,14 @@ export default function UserAccountPage() {
 
           {/* User Information Grid */}
           <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Informations personnelles
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Informations personnelles
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 {isEditing ? (
                   <>
                     <div>
@@ -705,13 +721,13 @@ export default function UserAccountPage() {
                 ) : (
                   <>
                     <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
+                      <Mail className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           {userData.email}
-                    </p>
-                  </div>
+                        </p>
+                      </div>
                     </div>
                     {userData.location && (
                       <div className="flex items-center gap-3">
@@ -721,13 +737,13 @@ export default function UserAccountPage() {
                           <p className="text-sm text-muted-foreground">
                             {userData.location}
                           </p>
-                </div>
-              </div>
+                        </div>
+                      </div>
                     )}
                   </>
                 )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>
@@ -777,7 +793,10 @@ export default function UserAccountPage() {
                         type="url"
                         value={formData.instagramUrl}
                         onChange={(e) =>
-                          setFormData({ ...formData, instagramUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            instagramUrl: e.target.value,
+                          })
                         }
                         placeholder="https://instagram.com/votrecompte"
                       />
@@ -791,7 +810,10 @@ export default function UserAccountPage() {
                         type="url"
                         value={formData.tiktokUrl}
                         onChange={(e) =>
-                          setFormData({ ...formData, tiktokUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            tiktokUrl: e.target.value,
+                          })
                         }
                         placeholder="https://tiktok.com/@votrecompte"
                       />
@@ -805,7 +827,10 @@ export default function UserAccountPage() {
                         type="url"
                         value={formData.linkedinUrl}
                         onChange={(e) =>
-                          setFormData({ ...formData, linkedinUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            linkedinUrl: e.target.value,
+                          })
                         }
                         placeholder="https://linkedin.com/in/votreprofil"
                       />
@@ -829,7 +854,9 @@ export default function UserAccountPage() {
                         </div>
                       </div>
                     )}
-                    {(userData.instagramUrl || userData.tiktokUrl || userData.linkedinUrl) && (
+                    {(userData.instagramUrl ||
+                      userData.tiktokUrl ||
+                      userData.linkedinUrl) && (
                       <div className="flex items-center gap-4 pt-2">
                         {userData.instagramUrl && (
                           <a
@@ -874,50 +901,54 @@ export default function UserAccountPage() {
 
           {/* Action Buttons */}
           {isEditing && (
-            <div className="flex justify-between items-center">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="destructive" disabled={isDeleting}>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer le compte
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Êtes-vous sûr ?</DialogTitle>
-                    <DialogDescription>
-                      Cette action est irr&eacute;versible. Toutes vos
-                      donn&eacute;es, publications et participations aux
-                      &eacute;v&eacute;nements seront supprim&eacute;es
-                      d&eacute;finitivement.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => {}}>
-                      Annuler
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={handleDeleteAccount}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting
-                        ? "Suppression..."
-                        : "Supprimer définitivement"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleCancel}>
-                  <X className="h-4 w-4 mr-2" />
-                  Annuler
-                </Button>
-                <Button onClick={handleSave}>
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center">
+              {/* Boutons principaux - responsive */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-2 order-2 sm:order-1">
+                <Button onClick={handleSave} className="w-full sm:w-auto">
                   <Save className="h-4 w-4 mr-2" />
                   Sauvegarder
                 </Button>
+                <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
+                  <X className="h-4 w-4 mr-2" />
+                  Annuler
+                </Button>
+              </div>
+
+              {/* Bouton supprimer - en bas sur mobile */}
+              <div className="order-3 sm:order-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive" disabled={isDeleting} className="w-full sm:w-auto">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer le compte
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Êtes-vous sûr ?</DialogTitle>
+                      <DialogDescription>
+                        Cette action est irr&eacute;versible. Toutes vos
+                        donn&eacute;es, publications et participations aux
+                        &eacute;v&eacute;nements seront supprim&eacute;es
+                        d&eacute;finitivement.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => {}}>
+                        Annuler
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting
+                          ? "Suppression..."
+                          : "Supprimer définitivement"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           )}
@@ -1040,7 +1071,6 @@ export default function UserAccountPage() {
               </Button>
             </CardContent>
           </Card>
-
         </div>
       </SidebarInset>
     </SidebarProvider>

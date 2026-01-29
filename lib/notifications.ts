@@ -279,6 +279,27 @@ async function buildNotificationMessage(params: {
       }
       return "Votre inscription à l'événement est en liste d'attente";
 
+    case "member_joined":
+      if (relatedUserId) {
+        const user = await db
+          .select({ name: users.name })
+          .from(users)
+          .where(eq(users.id, relatedUserId))
+          .limit(1);
+        const userName = user[0]?.name || "Un utilisateur";
+        if (relatedCompanyId) {
+          const company = await db
+            .select({ name: companies.name })
+            .from(companies)
+            .where(eq(companies.id, relatedCompanyId))
+            .limit(1);
+          const companyName = company[0]?.name || "votre association";
+          return `${userName} a rejoint ${companyName}`;
+        }
+        return `${userName} a rejoint votre association`;
+      }
+      return "Un utilisateur a rejoint votre association";
+
     default:
       return "Nouvelle notification";
   }

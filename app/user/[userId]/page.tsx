@@ -153,6 +153,8 @@ export default function PublicUserProfilePage({
   const [followingUsers, setFollowingUsers] = useState<any[]>([]);
   const [followingCompanies, setFollowingCompanies] = useState<any[]>([]);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [memberships, setMemberships] = useState<any[]>([]);
+  const [loadingMemberships, setLoadingMemberships] = useState(false);
   const hasScrolled = useScroll();
 
   useEffect(() => {
@@ -174,6 +176,13 @@ export default function PublicUserProfilePage({
 
     fetchProfile();
   }, [resolvedParams.userId, router]);
+
+  // Charger les memberships quand le profil est disponible
+  useEffect(() => {
+    if (profile && !loading) {
+      loadMemberships();
+    }
+  }, [profile, loading]);
 
   // Vérifier si l'user connecté suit ce profil
   useEffect(() => {
@@ -284,6 +293,22 @@ export default function PublicUserProfilePage({
       );
     } finally {
       setLoadingFollowing(false);
+    }
+  };
+
+  const loadMemberships = async () => {
+    if (!profile) return;
+    setLoadingMemberships(true);
+    try {
+      const response = await fetch(`/api/user/${profile.id}/memberships`);
+      if (response.ok) {
+        const data = await response.json();
+        setMemberships(data);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des associations membres:", error);
+    } finally {
+      setLoadingMemberships(false);
     }
   };
 
@@ -633,6 +658,59 @@ export default function PublicUserProfilePage({
 
               {/* Colonne latérale */}
               <div className="space-y-6">
+                {/* Associations membres */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" />
+                      Associations membres ({memberships.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Associations auxquelles cet utilisateur participe
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingMemberships ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        Chargement...
+                      </div>
+                    ) : memberships.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4 text-sm">
+                        Aucune association membre
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {memberships.map((membership) => (
+                          <Link
+                            key={membership.id}
+                            href={`/associations/${encodeURIComponent(membership.name)}`}
+                            className="block"
+                          >
+                            <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={membership.logo || ""} />
+                                <AvatarFallback>
+                                  {membership.name.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">
+                                  {membership.name}
+                                </p>
+                                {membership.city && (
+                                  <p className="text-sm text-muted-foreground truncate">
+                                    {membership.city}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Associations suivies */}
                 <Card>
                   <CardHeader>
@@ -654,7 +732,7 @@ export default function PublicUserProfilePage({
                         {profile.followedCompanies.map((company) => (
                           <Link
                             key={company.id}
-                            href={`/company/${company.name}`}
+                            href={`/associations/${encodeURIComponent(company.name)}`}
                             className="block"
                           >
                             <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors">
@@ -799,7 +877,7 @@ export default function PublicUserProfilePage({
                     className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-accent transition-colors"
                   >
                     <Link
-                      href={`/company/${company.name}`}
+                      href={`/associations/${encodeURIComponent(company.name)}`}
                       className="flex items-center gap-3 flex-1"
                     >
                       <Avatar className="h-10 w-10">

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { events, eventParticipants, users, companies } from "@/lib/schema";
+import {
+  events,
+  eventParticipants,
+  users,
+  companies,
+  eventSlots,
+  eventSlotParticipants,
+} from "@/lib/schema";
 import { eq, and, asc } from "drizzle-orm";
+import type { MissionType } from "@/lib/schema";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { createNotification } from "@/lib/notifications";
 
@@ -155,13 +163,107 @@ export async function POST(
       );
     }
 
-    // Vérifier si la validation manuelle est activée (via le body de la requête)
+    // Vérifier si la validation manuelle est activée et récupérer slot_id et missionType (via le body de la requête)
     let requiresManualApproval = false;
+    let slotId: number | null = null;
+    let missionType: MissionType | null = null;
     try {
       const body = await request.json();
       requiresManualApproval = body.requiresManualApproval === true;
+      slotId = body.slotId ? parseInt(body.slotId) : null;
+      missionType = body.missionType || null;
     } catch {
       // Pas de body, utiliser le comportement par défaut
+    }
+
+    // Si slot_id est fourni, vérifier que le slot existe et a de la place
+    if (slotId !== null) {
+      // Récupérer le slot avec ses missions
+      const slotCheck = await db
+        .select({
+          id: eventSlots.id,
+          maxParticipants: eventSlots.maxParticipants,
+          eventId: eventSlots.eventId,
+          missions: eventSlots.missions,
+          missionType: eventSlots.missionType,
+          missionDescription: eventSlots.missionDescription,
+        })
+        .from(eventSlots)
+        .where(and(eq(eventSlots.id, slotId), eq(eventSlots.eventId, eventIdNum)))
+        .limit(1);
+
+      if (slotCheck.length === 0) {
+        return NextResponse.json(
+          { error: "Créneau non trouvé" },
+          { status: 404 }
+        );
+      }
+
+      const slot = slotCheck[0];
+
+      // Normaliser les missions : utiliser le nouveau format si disponible
+      const missions = slot.missions || (slot.missionType ? [{
+        type: slot.missionType,
+        description: slot.missionDescription,
+        maxParticipants: slot.maxParticipants || 10,
+      }] : []);
+
+      // Si le slot a des missions, missionType devient obligatoire
+      if (missions.length > 0) {
+        if (!missionType) {
+          return NextResponse.json(
+            { error: "Une mission doit être sélectionnée pour ce créneau" },
+            { status: 400 }
+          );
+        }
+
+        // Vérifier que la mission existe dans le slot
+        const mission = missions.find((m: any) => m.type === missionType);
+        if (!mission) {
+          return NextResponse.json(
+            { error: "Mission non trouvée pour ce créneau" },
+            { status: 400 }
+          );
+        }
+
+        // Compter les participants déjà inscrits pour cette mission spécifique dans ce créneau
+        const missionParticipants = await db
+          .select()
+          .from(eventSlotParticipants)
+          .where(
+            and(
+              eq(eventSlotParticipants.slotId, slotId),
+              eq(eventSlotParticipants.missionType, missionType),
+              // Seulement les participants inscrits (pas les pré-remplis pour cette validation)
+              // On vérifie que participantId n'est pas null
+            )
+          );
+
+        const missionRegisteredCount = missionParticipants.filter(
+          (p) => p.participantId !== null
+        ).length;
+
+        // Vérifier que la mission a encore de la place
+        if (missionRegisteredCount >= mission.maxParticipants) {
+          return NextResponse.json(
+            { error: `La mission "${missionType}" est complète pour ce créneau` },
+            { status: 400 }
+          );
+        }
+      } else {
+        // Ancien format sans missions : vérifier la capacité globale du slot
+        const slotParticipants = await db
+          .select()
+          .from(eventSlotParticipants)
+          .where(eq(eventSlotParticipants.slotId, slotId));
+
+        if (slotParticipants.length >= slot.maxParticipants) {
+          return NextResponse.json(
+            { error: "Ce créneau est complet" },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Déterminer le statut (pending, confirmed ou waitlisted)
@@ -170,8 +272,8 @@ export async function POST(
     if (requiresManualApproval) {
       // Si validation manuelle activée, mettre en pending
       participantStatus = "pending";
-    } else if (event.maxParticipants) {
-      // Compter les participants confirmés
+    } else if (slotId === null && event.maxParticipants) {
+      // Compter les participants confirmés seulement si pas de slot (gestion globale)
       const confirmedCount = await db
         .select({ id: eventParticipants.id })
         .from(eventParticipants)
@@ -194,8 +296,19 @@ export async function POST(
         eventId: eventIdNum,
         userId,
         status: participantStatus,
+        slotId: slotId,
       })
       .returning();
+
+    // Si slot_id est fourni, créer l'entrée dans event_slot_participants
+    if (slotId !== null) {
+      await db.insert(eventSlotParticipants).values({
+        slotId: slotId,
+        participantId: newParticipant[0].id,
+        prefilledName: null,
+        missionType: missionType || null,
+      });
+    }
 
     // Créer une notification pour l'entreprise propriétaire de l'événement
     const eventData = eventResult[0];

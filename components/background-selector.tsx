@@ -6,7 +6,11 @@ import { RefreshCw, Image as ImageIcon, Palette, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { generateRandomGradient, generateGradient, type Gradient } from "@/lib/gradient-generator";
+import {
+  generateRandomGradient,
+  generateGradient,
+  type Gradient,
+} from "@/lib/gradient-generator";
 import { cn } from "@/lib/utils";
 
 export interface BackgroundSelectorProps {
@@ -31,9 +35,11 @@ export function BackgroundSelector({
   showPreview = true,
 }: BackgroundSelectorProps) {
   const [currentGradient, setCurrentGradient] = useState<Gradient | null>(
-    backgroundGradient || null
+    backgroundGradient || null,
   );
-  const [editingColor, setEditingColor] = useState<"color1" | "color2" | null>(null);
+  const [editingColor, setEditingColor] = useState<"color1" | "color2" | null>(
+    null,
+  );
   const [colorInputValue, setColorInputValue] = useState("");
 
   // Générer un gradient initial si aucun n'existe
@@ -61,26 +67,31 @@ export function BackgroundSelector({
 
   const handleColorChange = (color: string, colorKey: "color1" | "color2") => {
     if (!currentGradient) return;
-    
+
     // Valider le format HEX
     const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
     if (!hexRegex.test(color)) return;
 
     // Extraire la direction du CSS actuel (format: linear-gradient(direction, color1, color2))
-    const directionMatch = currentGradient.css.match(/linear-gradient\(([^,]+),/);
+    const directionMatch = currentGradient.css.match(
+      /linear-gradient\(([^,]+),/,
+    );
     const direction = directionMatch?.[1]?.trim() || "to right";
 
     const newGradient = generateGradient(
       colorKey === "color1" ? color : currentGradient.color1,
       colorKey === "color2" ? color : currentGradient.color2,
-      direction
+      direction,
     );
-    
+
     setCurrentGradient(newGradient);
     onBackgroundGradientChange(newGradient);
   };
 
-  const handleColorInputChange = (value: string, colorKey: "color1" | "color2") => {
+  const handleColorInputChange = (
+    value: string,
+    colorKey: "color1" | "color2",
+  ) => {
     setColorInputValue(value);
     // Normaliser la valeur : ajouter # si absent, convertir en majuscules
     let hexValue = value.trim();
@@ -120,7 +131,12 @@ export function BackgroundSelector({
 
   // Déterminer le background à afficher dans l'aperçu
   const previewBackground = () => {
-    if (backgroundType === "image" && images.length > 0 && backgroundImageIndex !== null && backgroundImageIndex !== undefined) {
+    if (
+      backgroundType === "image" &&
+      images.length > 0 &&
+      backgroundImageIndex !== null &&
+      backgroundImageIndex !== undefined
+    ) {
       return images[backgroundImageIndex] || images[0];
     }
     if (backgroundType === "gradient" && currentGradient) {
@@ -132,11 +148,11 @@ export function BackgroundSelector({
   const previewBg = previewBackground();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Radio buttons pour choisir le type */}
-      <div className="space-y-3">
-        <Label>Type de background</Label>
-        <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <Label className="text-sm font-medium">Type de background</Label>
+        <div className="flex gap-3 w-full sm:w-auto">
           <Button
             type="button"
             variant={backgroundType === "image" ? "default" : "outline"}
@@ -147,14 +163,12 @@ export function BackgroundSelector({
               }
             }}
             disabled={images.length === 0}
-            className="flex-1"
+            className="flex-1 sm:flex-initial"
           >
             <ImageIcon className="h-4 w-4 mr-2" />
             Image
             {images.length === 0 && (
-              <span className="ml-2 text-xs opacity-70">
-                (Aucune image)
-              </span>
+              <span className="ml-2 text-xs opacity-70">(Aucune image)</span>
             )}
           </Button>
           <Button
@@ -162,7 +176,7 @@ export function BackgroundSelector({
             variant={backgroundType === "gradient" ? "default" : "outline"}
             size="sm"
             onClick={handleGradientSelect}
-            className="flex-1"
+            className="flex-1 sm:flex-initial"
           >
             <Palette className="h-4 w-4 mr-2" />
             Gradient
@@ -172,19 +186,19 @@ export function BackgroundSelector({
 
       {/* Sélection d'image */}
       {backgroundType === "image" && images.length > 0 && (
-        <div className="space-y-2">
-          <Label>Sélectionner une image</Label>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
+          <Label className="text-sm font-medium">Sélectionner une image</Label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {images.map((image, index) => (
               <button
                 key={index}
                 type="button"
                 onClick={() => handleImageSelect(index)}
                 className={cn(
-                  "relative aspect-video rounded-lg overflow-hidden border-2 transition-all",
+                  "relative aspect-video rounded-lg overflow-hidden border-2 transition-all hover:scale-105",
                   backgroundImageIndex === index
                     ? "border-primary ring-2 ring-primary ring-offset-2"
-                    : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                    : "border-muted-foreground/25 hover:border-muted-foreground/50",
                 )}
               >
                 <Image
@@ -208,15 +222,15 @@ export function BackgroundSelector({
 
       {/* Générateur de gradient */}
       {backgroundType === "gradient" && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label>Aperçu du gradient</Label>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <Label className="text-sm font-medium">Aperçu du gradient</Label>
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleGradientRetry}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto"
             >
               <RefreshCw className="h-4 w-4" />
               Nouveau gradient
@@ -231,18 +245,22 @@ export function BackgroundSelector({
             />
           )}
           {currentGradient && (
-            <div className="space-y-3">
-              <div className="flex gap-3 items-center">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 sm:items-end">
                 {/* Couleur 1 */}
                 <div className="flex-1 space-y-2">
-                  <Label className="text-xs text-muted-foreground">Couleur 1</Label>
+                  <Label className="text-xs text-muted-foreground font-medium">
+                    Couleur 1
+                  </Label>
                   <div className="flex gap-2 items-center">
                     <div className="relative">
                       <input
                         type="color"
                         value={currentGradient.color1}
-                        onChange={(e) => handleColorChange(e.target.value, "color1")}
-                        className="w-10 h-10 rounded border-2 border-border cursor-pointer"
+                        onChange={(e) =>
+                          handleColorChange(e.target.value, "color1")
+                        }
+                        className="w-12 h-12 rounded border-2 border-border cursor-pointer"
                         title="Cliquez pour changer la couleur"
                       />
                     </div>
@@ -251,9 +269,11 @@ export function BackgroundSelector({
                         <Input
                           type="text"
                           value={colorInputValue}
-                          onChange={(e) => handleColorInputChange(e.target.value, "color1")}
+                          onChange={(e) =>
+                            handleColorInputChange(e.target.value, "color1")
+                          }
                           placeholder="#000000"
-                          className="h-9 text-xs font-mono"
+                          className="h-10 text-sm font-mono"
                           onBlur={stopEditingColor}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -267,7 +287,7 @@ export function BackgroundSelector({
                           variant="ghost"
                           size="sm"
                           onClick={stopEditingColor}
-                          className="h-9 px-2"
+                          className="h-10 px-2"
                         >
                           ✓
                         </Button>
@@ -276,27 +296,35 @@ export function BackgroundSelector({
                       <button
                         type="button"
                         onClick={() => startEditingColor("color1")}
-                        className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent transition-colors text-sm font-mono"
+                        className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent transition-colors text-sm font-mono min-h-[40px]"
                       >
-                        <span className="flex-1 text-left">{currentGradient.color1}</span>
-                        <Edit2 className="h-3 w-3 text-muted-foreground" />
+                        <span className="flex-1 text-left">
+                          {currentGradient.color1}
+                        </span>
+                        <Edit2 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <span className="text-muted-foreground mt-6">→</span>
+                <div className="flex justify-center sm:justify-start">
+                  <span className="text-muted-foreground text-lg font-bold">→</span>
+                </div>
 
                 {/* Couleur 2 */}
                 <div className="flex-1 space-y-2">
-                  <Label className="text-xs text-muted-foreground">Couleur 2</Label>
+                  <Label className="text-xs text-muted-foreground font-medium">
+                    Couleur 2
+                  </Label>
                   <div className="flex gap-2 items-center">
                     <div className="relative">
                       <input
                         type="color"
                         value={currentGradient.color2}
-                        onChange={(e) => handleColorChange(e.target.value, "color2")}
-                        className="w-10 h-10 rounded border-2 border-border cursor-pointer"
+                        onChange={(e) =>
+                          handleColorChange(e.target.value, "color2")
+                        }
+                        className="w-12 h-12 rounded border-2 border-border cursor-pointer"
                         title="Cliquez pour changer la couleur"
                       />
                     </div>
@@ -305,9 +333,11 @@ export function BackgroundSelector({
                         <Input
                           type="text"
                           value={colorInputValue}
-                          onChange={(e) => handleColorInputChange(e.target.value, "color2")}
+                          onChange={(e) =>
+                            handleColorInputChange(e.target.value, "color2")
+                          }
                           placeholder="#000000"
-                          className="h-9 text-xs font-mono"
+                          className="h-10 text-sm font-mono"
                           onBlur={stopEditingColor}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -321,7 +351,7 @@ export function BackgroundSelector({
                           variant="ghost"
                           size="sm"
                           onClick={stopEditingColor}
-                          className="h-9 px-2"
+                          className="h-10 px-2"
                         >
                           ✓
                         </Button>
@@ -330,10 +360,12 @@ export function BackgroundSelector({
                       <button
                         type="button"
                         onClick={() => startEditingColor("color2")}
-                        className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent transition-colors text-sm font-mono"
+                        className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-input bg-background hover:bg-accent transition-colors text-sm font-mono min-h-[40px]"
                       >
-                        <span className="flex-1 text-left">{currentGradient.color2}</span>
-                        <Edit2 className="h-3 w-3 text-muted-foreground" />
+                        <span className="flex-1 text-left">
+                          {currentGradient.color2}
+                        </span>
+                        <Edit2 className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                       </button>
                     )}
                   </div>
@@ -344,29 +376,6 @@ export function BackgroundSelector({
         </div>
       )}
 
-      {/* Aperçu du background final */}
-      {showPreview && previewBg && (
-        <div className="space-y-2">
-          <Label>Aperçu final</Label>
-          <div className="relative aspect-video rounded-lg border-2 border-muted-foreground/25 overflow-hidden">
-            {typeof previewBg === "string" && previewBg.startsWith("http") ? (
-              <Image
-                src={previewBg}
-                alt="Preview"
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <div
-                className="w-full h-full"
-                style={{
-                  background: previewBg || undefined,
-                }}
-              />
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   Settings,
   Users,
   Bell,
+  UserCheck,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 
@@ -101,6 +102,11 @@ const navItems = [
         url: "/business/followers/insights",
       },
     ],
+  },
+  {
+    title: "Membres",
+    url: "/business/members",
+    icon: UserCheck,
   },
   {
     title: "Analyses",

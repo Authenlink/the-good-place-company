@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Heart, MessageCircle, Share2, MoreHorizontal } from "lucide-react";
@@ -135,16 +136,36 @@ export function PostCard({ post }: PostCardProps) {
         {/* Header avec avatar et nom */}
         <div className="flex items-center justify-between p-4 sm:p-5 pb-3 sm:pb-4">
           <div className="flex items-center space-x-3">
-            <Avatar className="h-9 w-9 sm:h-8 sm:w-8">
-              <AvatarImage src={displayImage} alt={displayName} />
-              <AvatarFallback>
-                {displayName.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            {post.isCompanyPost && post.companyName ? (
+              <Link href={`/associations/${encodeURIComponent(post.companyName)}`}>
+                <Avatar className="h-9 w-9 sm:h-8 sm:w-8 cursor-pointer hover:opacity-80 transition-opacity">
+                  <AvatarImage src={displayImage} alt={displayName} />
+                  <AvatarFallback>
+                    {displayName.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+            ) : (
+              <Avatar className="h-9 w-9 sm:h-8 sm:w-8">
+                <AvatarImage src={displayImage} alt={displayName} />
+                <AvatarFallback>
+                  {displayName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            )}
             <div>
-              <p className="text-sm sm:text-sm font-semibold text-foreground">
-                {displayName}
-              </p>
+              {post.isCompanyPost && post.companyName ? (
+                <Link 
+                  href={`/associations/${encodeURIComponent(post.companyName)}`}
+                  className="text-sm sm:text-sm font-semibold text-foreground hover:underline block"
+                >
+                  {displayName}
+                </Link>
+              ) : (
+                <p className="text-sm sm:text-sm font-semibold text-foreground">
+                  {displayName}
+                </p>
+              )}
               <p className="text-xs sm:text-xs text-muted-foreground">
                 {formatDistanceToNow(new Date(post.createdAt), {
                   addSuffix: true,

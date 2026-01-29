@@ -59,6 +59,8 @@ import {
   Upload,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { CompanyMembershipDialog } from "@/components/company-membership-dialog";
+import { Plus, X as XIcon } from "lucide-react";
 
 // Composants d'icônes pour les réseaux sociaux
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -110,9 +112,18 @@ export default function UserProfilePage() {
   });
   const [showFollowingUsers, setShowFollowingUsers] = useState(false);
   const [showFollowingCompanies, setShowFollowingCompanies] = useState(false);
-  const [followingUsers, setFollowingUsers] = useState<{id: number, name: string, bio?: string, image?: string}[]>([]);
-  const [followingCompanies, setFollowingCompanies] = useState<{id: number, name: string, city?: string, logo?: string}[]>([]);
+  const [followingUsers, setFollowingUsers] = useState<
+    { id: number; name: string; bio?: string; image?: string }[]
+  >([]);
+  const [followingCompanies, setFollowingCompanies] = useState<
+    { id: number; name: string; city?: string; logo?: string }[]
+  >([]);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [memberships, setMemberships] = useState<
+    { id: number; name: string; city?: string; logo?: string }[]
+  >([]);
+  const [loadingMemberships, setLoadingMemberships] = useState(false);
+  const [showMembershipDialog, setShowMembershipDialog] = useState(false);
   const hasScrolled = useScroll();
 
   // Données du profil utilisateur
@@ -257,6 +268,16 @@ export default function UserProfilePage() {
     loadStats();
   }, [status, session]);
 
+  // Charger les membreships au chargement de la page
+  useEffect(() => {
+    if (
+      status === "authenticated" &&
+      session?.user?.accountType !== "business"
+    ) {
+      loadMemberships();
+    }
+  }, [status, session]);
+
   const loadFollowingUsers = async () => {
     setLoadingFollowing(true);
     try {
@@ -283,10 +304,57 @@ export default function UserProfilePage() {
     } catch (error) {
       console.error(
         "Erreur lors du chargement des associations suivies:",
-        error
+        error,
       );
     } finally {
       setLoadingFollowing(false);
+    }
+  };
+
+  const loadMemberships = async () => {
+    setLoadingMemberships(true);
+    try {
+      const response = await fetch("/api/user/profile/memberships");
+      if (response.ok) {
+        const data = await response.json();
+        setMemberships(data);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des associations:", error);
+    } finally {
+      setLoadingMemberships(false);
+    }
+  };
+
+  const handleRemoveMembership = async (companyId: number) => {
+    try {
+      const response = await fetch(
+        `/api/user/profile/memberships/${companyId}`,
+        {
+          method: "DELETE",
+        },
+      );
+      if (response.ok) {
+        setMemberships(memberships.filter((m) => m.id !== companyId));
+        toast({
+          title: "Association retirée",
+          description: "L'association a été retirée de votre profil.",
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Erreur",
+          description: errorData.error || "Erreur lors de la suppression",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la suppression",
+        variant: "destructive",
+      });
     }
   };
 
@@ -315,9 +383,12 @@ export default function UserProfilePage() {
       });
       if (response.ok) {
         setFollowingCompanies(
-          followingCompanies.filter((c) => c.id !== companyId)
+          followingCompanies.filter((c) => c.id !== companyId),
         );
-        setStats({ ...stats, followingCompanies: stats.followingCompanies - 1 });
+        setStats({
+          ...stats,
+          followingCompanies: stats.followingCompanies - 1,
+        });
         toast({
           title: "Désabonnement réussi",
           description: "Vous ne suivez plus cette association.",
@@ -423,7 +494,7 @@ export default function UserProfilePage() {
       <DynamicSidebar />
       <SidebarInset>
         <header
-          className={`sticky top-0 z-10 flex h-16 shrink-0 items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
+          className={`sticky top-0 z-50 flex h-16 shrink-0 items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 ${
             hasScrolled ? "border-b" : ""
           }`}
         >
@@ -468,28 +539,29 @@ export default function UserProfilePage() {
           <Card className="overflow-hidden p-0">
             {/* Background Image or Gradient */}
             <div className="relative h-32 w-full">
-                {formData.backgroundType === "gradient" && formData.backgroundGradient ? (
-                  <div
-                    className="w-full h-full"
-                    style={{
-                      background: formData.backgroundGradient.css,
-                    }}
-                  />
-                ) : formData.banner ? (
-                  <Image
-                    src={formData.banner}
-                    alt="Background"
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
-                )}
-              </div>
+              {formData.backgroundType === "gradient" &&
+              formData.backgroundGradient ? (
+                <div
+                  className="w-full h-full"
+                  style={{
+                    background: formData.backgroundGradient.css,
+                  }}
+                />
+              ) : formData.banner ? (
+                <Image
+                  src={formData.banner}
+                  alt="Background"
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
+              )}
+            </div>
 
             <CardHeader className="pb-0">
               {/* Avatar and Basic Info */}
-              <div className="flex items-start gap-4 -mt-12 relative z-10">
+              <div className="flex items-start gap-4 -mt-12 relative z-0">
                 <div className="relative">
                   <Avatar className="h-20 w-20 border-4 border-background">
                     <AvatarImage src={formData.image} alt={formData.name} />
@@ -539,7 +611,7 @@ export default function UserProfilePage() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="bio" className="mb-2">
+                        <Label htmlFor="bio" className="mb-2 z-0">
                           Description
                         </Label>
                         <Textarea
@@ -562,8 +634,7 @@ export default function UserProfilePage() {
                       {userData.bio && (
                         <div className="mt-1">
                           <p className="text-sm text-muted-foreground whitespace-pre-line">
-                            {showFullBio ||
-                            userData.bio.length <= 150
+                            {showFullBio || userData.bio.length <= 150
                               ? userData.bio
                               : `${userData.bio.substring(0, 150)}...`}
                           </p>
@@ -615,7 +686,7 @@ export default function UserProfilePage() {
                             {
                               year: "numeric",
                               month: "long",
-                            }
+                            },
                           )}
                         </p>
                       </div>
@@ -626,11 +697,79 @@ export default function UserProfilePage() {
             </CardHeader>
           </Card>
 
+          {/* Mes associations - Mode édition */}
+          {isEditing && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Gérer mes associations</CardTitle>
+                <CardDescription>
+                  Ajoutez ou retirez des associations pour lesquelles vous
+                  participez à des événements
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {loadingMemberships ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Chargement...
+                  </div>
+                ) : memberships.length > 0 ? (
+                  <div className="space-y-3">
+                    {memberships.map((membership) => (
+                      <div
+                        key={membership.id}
+                        className="flex items-center justify-between gap-3 p-3 rounded-lg border hover:bg-accent transition-colors"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Avatar className="h-10 w-10 flex-shrink-0">
+                            <AvatarImage src={membership.logo || ""} />
+                            <AvatarFallback>
+                              {membership.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">
+                              {membership.name}
+                            </p>
+                            {membership.city && (
+                              <p className="text-sm text-muted-foreground truncate">
+                                {membership.city}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRemoveMembership(membership.id)}
+                        >
+                          <XIcon className="h-4 w-4 mr-2" />
+                          Retirer
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Aucune association ajoutée
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setShowMembershipDialog(true)}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter une association
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Background Selector - Only show when editing */}
           {isEditing && (
             <Card>
               <CardHeader>
-                <CardTitle>Personnalisation du background</CardTitle>
+                <CardTitle>Background</CardTitle>
                 <CardDescription>
                   Choisissez une image ou un gradient pour votre bannière
                 </CardDescription>
@@ -658,7 +797,10 @@ export default function UserProfilePage() {
                         setFormData({
                           ...formData,
                           banner: "",
-                          backgroundType: formData.backgroundType === "image" ? null : formData.backgroundType,
+                          backgroundType:
+                            formData.backgroundType === "image"
+                              ? null
+                              : formData.backgroundType,
                         });
                       }}
                     >
@@ -743,12 +885,16 @@ export default function UserProfilePage() {
                         id="referencedCity"
                         value={formData.referencedCity}
                         onChange={(e) =>
-                          setFormData({ ...formData, referencedCity: e.target.value })
+                          setFormData({
+                            ...formData,
+                            referencedCity: e.target.value,
+                          })
                         }
                         placeholder="Ville par défaut pour le calendrier d'événements"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
-                        Cette ville sera utilisée par défaut pour filtrer les événements dans le calendrier
+                        Cette ville sera utilisée par défaut pour filtrer les
+                        événements dans le calendrier
                       </p>
                     </div>
                   </>
@@ -778,7 +924,9 @@ export default function UserProfilePage() {
                       <div className="flex items-center gap-3">
                         <MapPin className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">Ville de référence</p>
+                          <p className="text-sm font-medium">
+                            Ville de référence
+                          </p>
                           <p className="text-sm text-muted-foreground">
                             {userData.referencedCity}
                           </p>
@@ -838,7 +986,10 @@ export default function UserProfilePage() {
                         type="url"
                         value={formData.instagramUrl}
                         onChange={(e) =>
-                          setFormData({ ...formData, instagramUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            instagramUrl: e.target.value,
+                          })
                         }
                         placeholder="https://instagram.com/votrecompte"
                       />
@@ -852,7 +1003,10 @@ export default function UserProfilePage() {
                         type="url"
                         value={formData.tiktokUrl}
                         onChange={(e) =>
-                          setFormData({ ...formData, tiktokUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            tiktokUrl: e.target.value,
+                          })
                         }
                         placeholder="https://tiktok.com/@votrecompte"
                       />
@@ -866,7 +1020,10 @@ export default function UserProfilePage() {
                         type="url"
                         value={formData.linkedinUrl}
                         onChange={(e) =>
-                          setFormData({ ...formData, linkedinUrl: e.target.value })
+                          setFormData({
+                            ...formData,
+                            linkedinUrl: e.target.value,
+                          })
                         }
                         placeholder="https://linkedin.com/in/votreprofil"
                       />
@@ -890,7 +1047,9 @@ export default function UserProfilePage() {
                         </div>
                       </div>
                     )}
-                    {(userData.instagramUrl || userData.tiktokUrl || userData.linkedinUrl) && (
+                    {(userData.instagramUrl ||
+                      userData.tiktokUrl ||
+                      userData.linkedinUrl) && (
                       <div className="flex items-center gap-4 pt-2">
                         {userData.instagramUrl && (
                           <a
@@ -944,7 +1103,9 @@ export default function UserProfilePage() {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.followingEvents}</div>
+                  <div className="text-2xl font-bold">
+                    {stats.followingEvents}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Événements suivis
                   </p>
@@ -954,7 +1115,9 @@ export default function UserProfilePage() {
                   <p className="text-sm text-muted-foreground">Publications</p>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{stats.followingCompanies}</div>
+                  <div className="text-2xl font-bold">
+                    {stats.followingCompanies}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Associations suivies
                   </p>
@@ -965,50 +1128,54 @@ export default function UserProfilePage() {
 
           {/* Action Buttons */}
           {isEditing && (
-            <div className="flex justify-between items-center">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="destructive" disabled={isDeleting}>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer le compte
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Êtes-vous sûr ?</DialogTitle>
-                    <DialogDescription>
-                      Cette action est irr&eacute;versible. Toutes vos
-                      donn&eacute;es, publications et participations aux
-                      &eacute;v&eacute;nements seront supprim&eacute;es
-                      d&eacute;finitivement.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => {}}>
-                      Annuler
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting
-                        ? "Suppression..."
-                        : "Supprimer définitivement"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleCancel}>
-                  <X className="h-4 w-4 mr-2" />
-                  Annuler
-                </Button>
-                <Button onClick={handleSave}>
+            <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-center">
+              {/* Boutons principaux - responsive */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-2 order-2 sm:order-1">
+                <Button onClick={handleSave} className="w-full sm:w-auto">
                   <Save className="h-4 w-4 mr-2" />
                   Sauvegarder
                 </Button>
+                <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
+                  <X className="h-4 w-4 mr-2" />
+                  Annuler
+                </Button>
+              </div>
+
+              {/* Bouton supprimer - en bas sur mobile */}
+              <div className="order-3 sm:order-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive" disabled={isDeleting} className="w-full sm:w-auto">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer le compte
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Êtes-vous sûr ?</DialogTitle>
+                      <DialogDescription>
+                        Cette action est irr&eacute;versible. Toutes vos
+                        donn&eacute;es, publications et participations aux
+                        &eacute;v&eacute;nements seront supprim&eacute;es
+                        d&eacute;finitivement.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => {}}>
+                        Annuler
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting
+                          ? "Suppression..."
+                          : "Supprimer définitivement"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           )}
@@ -1105,7 +1272,7 @@ export default function UserProfilePage() {
                     className="flex items-center justify-between gap-3 p-3 rounded-lg hover:bg-accent transition-colors"
                   >
                     <Link
-                      href={`/company/${company.name}`}
+                      href={`/associations/${encodeURIComponent(company.name)}`}
                       className="flex items-center gap-3 flex-1"
                     >
                       <Avatar className="h-10 w-10">
@@ -1137,6 +1304,16 @@ export default function UserProfilePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog pour ajouter des associations */}
+      <CompanyMembershipDialog
+        open={showMembershipDialog}
+        onOpenChange={setShowMembershipDialog}
+        onMembershipAdded={() => {
+          loadMemberships();
+        }}
+        existingMemberships={memberships.map((m) => m.id)}
+      />
     </SidebarProvider>
   );
 }

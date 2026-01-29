@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { events, companies, eventParticipants, users } from "@/lib/schema";
-import { eq, and, or } from "drizzle-orm";
+import {
+  events,
+  companies,
+  eventParticipants,
+  users,
+  eventSlots,
+  eventSlotParticipants,
+  MissionType,
+} from "@/lib/schema";
+import { eq, and, or, inArray } from "drizzle-orm";
 import { auth } from "@/app/api/auth/[...nextauth]/route";
 
 // GET - Détail d'un événement
@@ -108,6 +116,71 @@ export async function GET(
       (p) => p.userId === parseInt(session.user.id)
     );
 
+    // Récupérer les slots si l'événement a un planning
+    const slots = await db
+      .select()
+      .from(eventSlots)
+      .where(eq(eventSlots.eventId, eventIdNum))
+      .orderBy(eventSlots.startTime);
+
+    // Pour chaque slot, récupérer les participants
+    const slotsWithParticipants = await Promise.all(
+      slots.map(async (slot) => {
+        const slotParticipants = await db
+          .select({
+            id: eventSlotParticipants.id,
+            participantId: eventSlotParticipants.participantId,
+            prefilledName: eventSlotParticipants.prefilledName,
+            missionType: eventSlotParticipants.missionType,
+          })
+          .from(eventSlotParticipants)
+          .where(eq(eventSlotParticipants.slotId, slot.id));
+
+        const registeredCount = slotParticipants.filter(
+          (p) => p.participantId !== null
+        ).length;
+        const prefilledCount = slotParticipants.filter(
+          (p) => p.prefilledName !== null
+        ).length;
+
+        // Normaliser les missions : utiliser le nouveau format si disponible
+        const missions = slot.missions || (slot.missionType ? [{
+          type: slot.missionType,
+          description: slot.missionDescription,
+          maxParticipants: slot.maxParticipants || 10,
+        }] : []);
+
+        // Pour chaque mission, compter les participants inscrits pour cette mission spécifique
+        const missionsWithCounts = missions.map((mission) => {
+          // Compter les participants inscrits pour cette mission (participantId IS NOT NULL)
+          const missionRegisteredCount = slotParticipants.filter(
+            (p) => p.participantId !== null && p.missionType === mission.type
+          ).length;
+
+          // Compter les pré-remplis pour cette mission (prefilledName IS NOT NULL)
+          const missionPrefilledCount = slotParticipants.filter(
+            (p) => p.prefilledName !== null && p.missionType === mission.type
+          ).length;
+
+          return {
+            ...mission,
+            registeredCount: missionRegisteredCount,
+            prefilledCount: missionPrefilledCount,
+            availableSpots: Math.max(0, mission.maxParticipants - missionRegisteredCount),
+          };
+        });
+
+        return {
+          ...slot,
+          missions: missionsWithCounts,
+          registeredCount,
+          prefilledCount,
+          totalCount: registeredCount + prefilledCount,
+          availableSpots: slot.maxParticipants - (registeredCount + prefilledCount),
+        };
+      })
+    );
+
     return NextResponse.json({
       ...event,
       participants,
@@ -115,6 +188,8 @@ export async function GET(
       waitlistCount: waitlistedCount,
       pendingCount: pendingCount,
       currentUserStatus: currentUserParticipation?.status || null,
+      slots: slotsWithParticipants,
+      hasPlanning: slots.length > 0,
     });
   } catch (error) {
     console.error("Erreur lors de la récupération de l'événement:", error);
@@ -236,6 +311,7 @@ export async function PUT(
       contactPhone,
       externalLink,
       status,
+      planning,
     } = body;
 
     // Validation
@@ -319,6 +395,16 @@ export async function PUT(
         .set(updateFieldsWithDates)
         .where(eq(events.id, eventIdNum))
         .returning();
+
+      // Gérer le planning si fourni
+      if (planning !== undefined) {
+        await updateEventSlots(
+          eventIdNum,
+          planning,
+          startDate !== undefined ? new Date(startDate) : undefined,
+          endDate !== undefined ? (endDate ? new Date(endDate) : null) : undefined
+        );
+      }
 
       return NextResponse.json(updatedEvent[0]);
     }
@@ -434,5 +520,135 @@ export async function DELETE(
       { error: "Erreur interne du serveur" },
       { status: 500 }
     );
+  }
+}
+
+// Fonction pour mettre à jour les slots d'un événement
+async function updateEventSlots(
+  eventId: number,
+  planning: {
+    enabled: boolean;
+    slotDurationMinutes?: number;
+    slots?: Array<{
+      id?: number;
+      startTime: string;
+      endTime: string;
+      maxParticipants: number;
+      missions?: Array<{
+        type: string;
+        description?: string;
+        maxParticipants: number;
+      }>;
+      missionType?: string;
+      missionDescription?: string;
+    }>;
+  },
+  eventStartDate?: Date,
+  eventEndDate?: Date | null
+) {
+  // Récupérer les slots existants
+  const existingSlots = await db
+    .select({ id: eventSlots.id })
+    .from(eventSlots)
+    .where(eq(eventSlots.eventId, eventId));
+
+  const existingSlotIds = existingSlots.map((s) => s.id);
+
+  if (!planning.enabled) {
+    // Si le planning est désactivé, supprimer tous les slots
+    if (existingSlotIds.length > 0) {
+      await db
+        .delete(eventSlots)
+        .where(eq(eventSlots.eventId, eventId));
+    }
+    return;
+  }
+
+  if (!planning.slots || planning.slots.length === 0) {
+    // Si aucun slot n'est fourni mais le planning est activé, supprimer les anciens
+    if (existingSlotIds.length > 0) {
+      await db
+        .delete(eventSlots)
+        .where(eq(eventSlots.eventId, eventId));
+    }
+    return;
+  }
+
+  // Séparer les slots à mettre à jour (avec id) et ceux à créer (sans id)
+  const slotsToUpdate = planning.slots.filter((s) => s.id !== undefined);
+  const slotsToCreate = planning.slots.filter((s) => s.id === undefined);
+  const updatedSlotIds = slotsToUpdate.map((s) => s.id!);
+
+  // Supprimer les slots qui ne sont plus dans la liste
+  const slotsToDelete = existingSlotIds.filter((id) => !updatedSlotIds.includes(id));
+  if (slotsToDelete.length > 0) {
+    await db
+      .delete(eventSlots)
+      .where(inArray(eventSlots.id, slotsToDelete));
+  }
+
+  // Mettre à jour les slots existants
+  for (const slot of slotsToUpdate) {
+    const startTime = new Date(slot.startTime);
+    const endTime = new Date(slot.endTime);
+
+    // Normaliser les missions
+    const missions = slot.missions || (slot.missionType ? [{
+      type: slot.missionType as MissionType,
+      description: slot.missionDescription,
+      maxParticipants: slot.maxParticipants || 10,
+    }] : [{
+      type: "autre" as MissionType,
+      description: "",
+      maxParticipants: slot.maxParticipants || 10,
+    }]);
+
+    await db
+      .update(eventSlots)
+      .set({
+        startTime,
+        endTime,
+        maxParticipants: slot.maxParticipants,
+        missions: missions as any,
+        missionType: (missions[0]?.type || null) as MissionType | null,
+        missionDescription: missions[0]?.description || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventSlots.id, slot.id!));
+  }
+
+  // Créer les nouveaux slots
+  if (slotsToCreate.length > 0 && eventStartDate && eventEndDate) {
+    for (const slot of slotsToCreate) {
+      const startTime = new Date(slot.startTime);
+      const endTime = new Date(slot.endTime);
+
+      // Vérifier que le créneau est dans les dates de l'événement
+      if (startTime < eventStartDate || endTime > eventEndDate) {
+        console.warn(`Slot ignoré car hors des dates de l'événement: ${slot.startTime} - ${slot.endTime}`);
+        continue;
+      }
+
+      // Normaliser les missions
+      const missions = slot.missions || (slot.missionType ? [{
+        type: slot.missionType as MissionType,
+        description: slot.missionDescription,
+        maxParticipants: slot.maxParticipants || 10,
+      }] : [{
+        type: "autre" as MissionType,
+        description: "",
+        maxParticipants: slot.maxParticipants || 10,
+      }]);
+
+      await db.insert(eventSlots).values({
+        eventId: eventId,
+        startTime: startTime,
+        endTime: endTime,
+        maxParticipants: slot.maxParticipants,
+        missions: missions as any,
+        missionType: (missions[0]?.type || null) as MissionType | null,
+        missionDescription: missions[0]?.description || null,
+      });
+    }
   }
 }

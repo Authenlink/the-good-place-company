@@ -18,6 +18,8 @@ import {
     Link as LinkIcon,
     ImageIcon,
     AlertTriangle,
+    HelpCircle,
+    Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,9 +64,13 @@ import {
     EVENT_CATEGORIES,
     RecurrenceType,
     EventType,
+    MissionType,
 } from "@/lib/schema";
 import { BackgroundSelector } from "@/components/background-selector";
 import { generateRandomGradient, type Gradient } from "@/lib/gradient-generator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { EventPlanningCalendar } from "@/components/event-planning-calendar";
+import { PlanningInfoDialog } from "@/components/planning-info-dialog";
 
 interface EventData {
   id: number;
@@ -99,6 +105,20 @@ interface EventData {
   contactPhone: string | null;
   externalLink: string | null;
   status: string;
+  hasPlanning?: boolean;
+  slots?: Array<{
+    id: number;
+    startTime: string;
+    endTime: string;
+    maxParticipants: number;
+    missions?: Array<{
+      type: string;
+      description?: string | null;
+      maxParticipants: number;
+    }>;
+    missionType?: string | null;
+    missionDescription?: string | null;
+  }>;
 }
 
 export default function EditEventPage({
@@ -154,6 +174,26 @@ export default function EditEventPage({
   const [backgroundType, setBackgroundType] = useState<"image" | "gradient" | null>("gradient");
   const [backgroundImageIndex, setBackgroundImageIndex] = useState<number | null>(null);
   const [backgroundGradient, setBackgroundGradient] = useState<Gradient | null>(null);
+
+  // Planning
+  const [planningEnabled, setPlanningEnabled] = useState(false);
+  const [slotDuration, setSlotDuration] = useState("60"); // en minutes
+  const [slots, setSlots] = useState<
+    Array<{
+      id?: number;
+      startTime: string;
+      endTime: string;
+      maxParticipants: number;
+      missions: Array<{
+        type: MissionType;
+        description?: string;
+        maxParticipants: number;
+      }>;
+      // Champs dépréciés pour compatibilité
+      missionType?: MissionType;
+      missionDescription?: string;
+    }>
+  >([]);
 
   // États de chargement et données
   const [loading, setLoading] = useState(true);
@@ -249,6 +289,38 @@ export default function EditEventPage({
             // Générer un gradient par défaut si aucun n'existe
             const initialGradient = generateRandomGradient();
             setBackgroundGradient(initialGradient);
+          }
+
+          // Charger les slots si l'événement a un planning
+          if (data.hasPlanning && data.slots) {
+            setPlanningEnabled(true);
+            // Calculer la durée moyenne des slots pour slotDuration
+            if (data.slots.length > 0) {
+              const firstSlot = data.slots[0];
+              const start = new Date(firstSlot.startTime);
+              const end = new Date(firstSlot.endTime);
+              const durationMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+              setSlotDuration(durationMinutes.toString());
+            }
+            // Convertir les slots au format attendu
+            const formattedSlots = data.slots.map((slot) => ({
+              id: slot.id,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              maxParticipants: slot.maxParticipants,
+              missions: (slot.missions || (slot.missionType ? [{
+                type: slot.missionType,
+                description: slot.missionDescription || undefined,
+                maxParticipants: slot.maxParticipants || 10,
+              }] : [])).map((m: { type: string; description?: string | null; maxParticipants: number }) => ({
+                type: m.type as MissionType,
+                description: m.description || undefined,
+                maxParticipants: m.maxParticipants,
+              })),
+              missionType: slot.missionType as MissionType | undefined,
+              missionDescription: slot.missionDescription || undefined,
+            })) as typeof slots;
+            setSlots(formattedSlots);
           }
         } else if (response.status === 404) {
           toast({
@@ -460,6 +532,80 @@ export default function EditEventPage({
     }
   };
 
+  // Fonctions pour gérer le planning
+  const generateSlots = () => {
+    if (!startDate || !startTime) {
+      toast({
+        title: "Date et heure requises",
+        description: "Veuillez d'abord définir la date et l'heure de début de l'événement.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = endDate && endTime
+      ? new Date(`${endDate}T${endTime}`)
+      : endTime
+      ? new Date(`${startDate}T${endTime}`)
+      : null;
+
+    if (!end) {
+      toast({
+        title: "Heure de fin requise",
+        description: "Veuillez définir l'heure de fin pour générer les créneaux.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const duration = parseInt(slotDuration);
+    if (duration < 15) {
+      toast({
+        title: "Durée invalide",
+        description: "La durée minimale d'un créneau est de 15 minutes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const generatedSlots: typeof slots = [];
+    let currentStart = new Date(start);
+
+    while (currentStart < end) {
+      const currentEnd = new Date(currentStart.getTime() + duration * 60000);
+      if (currentEnd > end) break;
+
+      generatedSlots.push({
+        startTime: currentStart.toISOString(),
+        endTime: currentEnd.toISOString(),
+        maxParticipants: 10,
+        missions: [{
+          type: "autre",
+          description: "",
+          maxParticipants: 10,
+        }],
+      });
+
+      currentStart = new Date(currentEnd);
+    }
+
+    if (generatedSlots.length === 0) {
+      toast({
+        title: "Aucun créneau généré",
+        description: "La durée des créneaux est trop longue pour la durée de l'événement.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSlots(generatedSlots);
+    toast({
+      title: `${generatedSlots.length} créneau(x) généré(s)`,
+      description: "Vous pouvez maintenant les personnaliser.",
+    });
+  };
+
   const handleSubmit = async () => {
     // Validation avec messages d'erreur détaillés
     const errors: string[] = [];
@@ -549,6 +695,23 @@ export default function EditEventPage({
         contactEmail: contactEmail.trim() || null,
         contactPhone: contactPhone.trim() || null,
         externalLink: externalLink.trim() || null,
+        planning: planningEnabled
+          ? {
+              enabled: true,
+              slotDurationMinutes: parseInt(slotDuration),
+              slots: slots.map((slot) => ({
+                id: slot.id, // Garder l'ID pour les slots existants
+                startTime: slot.startTime,
+                endTime: slot.endTime,
+                maxParticipants: slot.maxParticipants,
+                missions: slot.missions || (slot.missionType ? [{
+                  type: slot.missionType,
+                  description: slot.missionDescription,
+                  maxParticipants: slot.maxParticipants || 10,
+                }] : []),
+              })),
+            }
+          : { enabled: false },
       };
 
       const response = await fetch(`/api/events/${resolvedParams.eventId}`, {
@@ -639,7 +802,7 @@ export default function EditEventPage({
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Modifier l'événement</BreadcrumbPage>
+                  <BreadcrumbPage>Modifier l&apos;événement</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -649,7 +812,7 @@ export default function EditEventPage({
         <div className="flex flex-1 flex-col gap-6 p-6">
           {/* Header */}
           <div>
-            <h1 className="text-3xl font-bold">Modifier l'événement</h1>
+            <h1 className="text-3xl font-bold">Modifier l&apos;événement</h1>
             <p className="text-muted-foreground mt-1">
               Modifiez les informations de votre événement
             </p>
@@ -663,7 +826,7 @@ export default function EditEventPage({
                   <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-orange-800 dark:text-orange-200">
-                      <strong>Événement récurrent :</strong> Cet événement fait partie d'une série récurrente. Les modifications apportées seront appliquées à tous les événements de la série.
+                      <strong>Événement récurrent :</strong> Cet événement fait partie d&apos;une série récurrente. Les modifications apportées seront appliquées à tous les événements de la série.
                     </p>
                   </div>
                 </div>
@@ -671,6 +834,22 @@ export default function EditEventPage({
             </Card>
           )}
 
+          <Tabs defaultValue="informations" className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="informations">Informations</TabsTrigger>
+              <TabsTrigger 
+                value="planning" 
+                disabled={!startDate || !startTime}
+                title={!startDate || !startTime ? "Veuillez d'abord renseigner la date et l'heure de début" : ""}
+              >
+                Planning
+                {(!startDate || !startTime) && (
+                  <HelpCircle className="h-3 w-3 ml-1 text-muted-foreground" />
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="informations" className="mt-6">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Colonne principale */}
             <div className="xl:col-span-2 space-y-6">
@@ -1308,6 +1487,164 @@ export default function EditEventPage({
               </Card>
             </div>
           </div>
+            </TabsContent>
+
+            <TabsContent value="planning" className="mt-6">
+              <div className="space-y-6">
+                {/* Message d'avertissement si les dates ne sont pas renseignées */}
+                {(!startDate || !startTime) && (
+                  <Card className="border-orange-500/50 bg-orange-500/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <HelpCircle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-orange-900 dark:text-orange-100 mb-1">
+                            Dates et horaires requis
+                          </h4>
+                          <p className="text-sm text-orange-800 dark:text-orange-200">
+                            Pour créer un planning, vous devez d&apos;abord renseigner la <strong>date de début</strong> et l&apos;<strong>heure de début</strong> de votre événement dans l&apos;onglet &quot;Informations&quot;.
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => {
+                              // Trouver l'onglet informations et le sélectionner
+                              const informationsTab = document.querySelector('[value="informations"]') as HTMLElement;
+                              if (informationsTab) {
+                                informationsTab.click();
+                              }
+                            }}
+                          >
+                            Aller à l&apos;onglet Informations
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Activation du planning */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="flex items-center gap-2">
+                          <Clock className="h-5 w-5" />
+                          Planning de l&apos;événement
+                        </CardTitle>
+                        <CardDescription>
+                          Créez des créneaux horaires pour organiser les inscriptions
+                        </CardDescription>
+                      </div>
+                      <PlanningInfoDialog />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="planning-enabled" className="text-base">
+                          Activer le planning
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Les participants devront choisir un créneau lors de
+                          l&apos;inscription
+                        </p>
+                      </div>
+                      <Switch
+                        id="planning-enabled"
+                        checked={planningEnabled}
+                        onCheckedChange={setPlanningEnabled}
+                      />
+                    </div>
+
+                    {planningEnabled && (
+                      <>
+                        <Separator />
+                        
+                        {/* Configuration de la durée */}
+                        <div className="flex items-end gap-4">
+                          <div className="flex-1 space-y-2">
+                            <Label htmlFor="slot-duration">
+                              Durée des créneaux (minutes)
+                            </Label>
+                            <Input
+                              id="slot-duration"
+                              type="number"
+                              min="15"
+                              step="15"
+                              value={slotDuration}
+                              onChange={(e) => setSlotDuration(e.target.value)}
+                              placeholder="60"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Durée minimale : 15 minutes
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={generateSlots}
+                            disabled={!startDate || !startTime}
+                            className="h-10"
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            Générer automatiquement
+                          </Button>
+                        </div>
+
+                        <Separator />
+
+                        {/* Calendrier de planning */}
+                        <div className="space-y-4">
+                          <div>
+                            <h3 className="text-lg font-semibold mb-1">
+                              Planning ({slots.length} créneau{slots.length > 1 ? "x" : ""})
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              {startDate && startTime
+                                ? "Cliquez sur une heure pour ajouter un créneau, ou utilisez le bouton \"Générer automatiquement\""
+                                : "Veuillez d'abord définir la date et l'heure de début de l'événement pour afficher le calendrier"}
+                            </p>
+                          </div>
+                          
+                          {startDate && startTime ? (
+                            <EventPlanningCalendar
+                              slots={slots}
+                              onSlotsChange={setSlots}
+                              eventStartDate={
+                                startDate && startTime
+                                  ? new Date(`${startDate}T${startTime}`)
+                                  : new Date()
+                              }
+                              eventEndDate={
+                                endDate && endTime
+                                  ? new Date(`${endDate}T${endTime}`)
+                                  : endTime
+                                  ? new Date(`${startDate}T${endTime}`)
+                                  : startDate && startTime
+                                  ? new Date(`${startDate}T${startTime}`)
+                                  : new Date()
+                              }
+                              slotDurationMinutes={parseInt(slotDuration) || 60}
+                            />
+                          ) : (
+                            <Card>
+                              <CardContent className="p-8 text-center">
+                                <Clock className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                <p className="text-muted-foreground">
+                                  Veuillez d&apos;abord définir la date et l&apos;heure de début de l&apos;événement dans l&apos;onglet &quot;Informations&quot; pour afficher le calendrier.
+                                </p>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </SidebarInset>
     </SidebarProvider>

@@ -24,6 +24,14 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -34,6 +42,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
 import { useScroll } from "@/hooks/use-scroll";
 import {
   MapPin,
@@ -46,8 +60,11 @@ import {
   Target,
   ChevronDown,
   ChevronUp,
+  Search,
+  Loader2,
+  Users,
 } from "lucide-react";
-import { EVENT_TYPES } from "@/lib/schema";
+import { EVENT_TYPES, MEMBER_TYPES } from "@/lib/schema";
 import { cn } from "@/lib/utils";
 
 // Composants d'icônes pour les réseaux sociaux
@@ -113,6 +130,7 @@ interface AssociationData {
   linkedinUrl: string;
   createdAt: string;
   isFollowing?: boolean;
+  isOwner?: boolean;
   events: Array<{
     id: number;
     title: string;
@@ -153,6 +171,7 @@ export default function AssociationPage({
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isTogglingFollow, setIsTogglingFollow] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const hasScrolled = useScroll();
 
   useEffect(() => {
@@ -165,6 +184,7 @@ export default function AssociationPage({
           const data = await response.json();
           setAssociation(data.association);
           setIsFollowing(data.association.isFollowing || false);
+          setIsOwner(data.association.isOwner === true);
         } else if (response.status === 404) {
           router.push("/associations");
         }
@@ -454,8 +474,18 @@ export default function AssociationPage({
 
             <Separator />
 
-            {/* Contenu principal */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Onglets */}
+            <Tabs defaultValue="info" className="w-full">
+              <TabsList>
+                <TabsTrigger value="info">Informations générales</TabsTrigger>
+                {session?.user && (
+                  <TabsTrigger value="members">Liste des membres</TabsTrigger>
+                )}
+              </TabsList>
+
+              {/* Onglet Informations générales */}
+              <TabsContent value="info" className="mt-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Colonne principale */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Événements */}
@@ -689,10 +719,166 @@ export default function AssociationPage({
                   </CardContent>
                 </Card>
               </div>
-            </div>
+                </div>
+              </TabsContent>
+
+              {/* Onglet Membres */}
+              {session?.user && (
+                <TabsContent value="members" className="mt-6">
+                  <MembersList associationName={association.name} />
+                </TabsContent>
+              )}
+            </Tabs>
           </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+// Composant pour la liste des membres
+function MembersList({ associationName }: { associationName: string }) {
+  const [members, setMembers] = useState<Array<{
+    id: number;
+    name: string | null;
+    email: string;
+    image: string | null;
+    memberType: "volunteer" | "permanent_member";
+    joinedAt: Date;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMemberType, setSelectedMemberType] = useState<string>("all");
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (searchTerm.trim()) {
+          params.append("search", searchTerm.trim());
+        }
+        if (selectedMemberType !== "all") {
+          params.append("memberType", selectedMemberType);
+        }
+
+        const response = await fetch(
+          `/api/associations/${encodeURIComponent(associationName)}/members?${params.toString()}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setMembers(data.members || []);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des membres:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, [associationName, searchTerm, selectedMemberType]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Membres de l'association</CardTitle>
+        <CardDescription>
+          Liste des personnes qui participent à cette association
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Filtres */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              type="text"
+              placeholder="Rechercher un membre..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select
+            value={selectedMemberType}
+            onValueChange={setSelectedMemberType}
+          >
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Tous les types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les types</SelectItem>
+              <SelectItem value="volunteer">{MEMBER_TYPES.volunteer}</SelectItem>
+              <SelectItem value="permanent_member">{MEMBER_TYPES.permanent_member}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Liste des membres */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+            <span className="text-muted-foreground">Chargement...</span>
+          </div>
+        ) : members.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {members.map((member) => (
+              <Link
+                key={member.id}
+                href={`/user/${member.id}`}
+                className="block"
+              >
+                <Card className="hover:bg-accent transition-colors cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={member.image || ""} alt={member.name || ""} />
+                        <AvatarFallback>
+                          {member.name
+                            ? member.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .slice(0, 2)
+                            : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate hover:underline">
+                          {member.name || "Utilisateur"}
+                        </h3>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {member.email}
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {MEMBER_TYPES[member.memberType]}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(member.joinedAt), "MMM yyyy", {
+                              locale: fr,
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">
+              {searchTerm || selectedMemberType !== "all"
+                ? "Aucun membre trouvé"
+                : "Aucun membre pour le moment"}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

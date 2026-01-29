@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { useScroll } from "@/hooks/use-scroll";
 import { Users, Filter, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -292,7 +293,10 @@ export default function AssociationsPage() {
                   <CardContent className="px-4 pb-4 pt-0">
                     <div className="flex items-start gap-3 mb-4">
                       {/* Logo positionné sur la banner */}
-                      <div className="w-12 h-12 bg-background border-2 border-background rounded-lg flex items-center justify-center flex-shrink-0 -mt-8 relative z-10">
+                      <Link 
+                        href={`/associations/${encodeURIComponent(association.name)}`}
+                        className="w-12 h-12 bg-background border-2 border-background rounded-lg flex items-center justify-center flex-shrink-0 -mt-8 relative z-10 cursor-pointer hover:opacity-80 transition-opacity"
+                      >
                         {association.logo ? (
                           <Image
                             src={association.logo}
@@ -304,12 +308,15 @@ export default function AssociationsPage() {
                         ) : (
                           <Users className="h-6 w-6 text-muted-foreground" />
                         )}
-                      </div>
+                      </Link>
                       <div className="flex-1 min-w-0 -mt-6">
                         {/* Titre aligné avec le logo */}
-                        <h3 className="font-bold text-lg leading-tight mt-2">
+                        <Link 
+                          href={`/associations/${encodeURIComponent(association.name)}`}
+                          className="font-bold text-lg leading-tight mt-2 hover:underline block"
+                        >
                           {association.name}
-                        </h3>
+                        </Link>
                       </div>
                     </div>
 
